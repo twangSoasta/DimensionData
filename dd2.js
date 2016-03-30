@@ -367,12 +367,19 @@ function getMyAccount(error, response, body) {
 
 function getNetworkId(err,res,body){
 	if (!err && res.statusCode == 200) {
-		console.log("Getting the Network ID...");
+		console.log("Getting the Network ID..."+body);
 		var doc = new dom().parseFromString(body);
-    networkDomainId = select(doc, "//*[local-name()='id']/text()")[0].data;
+	if (isOld(dcLocation)){
+       networkDomainId = select(doc, "//*[local-name()='id']/text()")[0].data;
+	} else {
+	   networkDomainId = JSON.parse(body).networkDomain[0].id;
+	}
     console.log('networkDomainId ID: '+networkDomainId);   
-    options.url = 'https://api-na.dimensiondata.com/oec/0.9/'+org_id+'/network/'+networkDomainId+'/natrule';
-//options.url = 'https://api-na.dimensiondata.com/caas/2.1/'+org_id+'/network/natRule?networkDomainId='+networkDomainId;
+	if (isOld(dcLocation)) {
+       options.url = 'https://api-na.dimensiondata.com/oec/0.9/'+org_id+'/network/'+networkDomainId+'/natrule';
+	} else {
+       options.url = 'https://api-na.dimensiondata.com/caas/2.1/'+org_id+'/network/natRule?networkDomainId='+networkDomainId;
+	}   
     request(options,getNatRules);     			
 	} else {
 		console.log(err);
@@ -381,25 +388,43 @@ function getNetworkId(err,res,body){
 
 function getNatRules(err,res,body){
 	if (!err && res.statusCode == 200) {
-		console.log("Getting the Network ID...");
-		console.log(body);
-		var doc = new dom().parseFromString(body);
-    sourceIpArr = select(doc, "//*[local-name()='sourceIp']/text()");
-    natIpArr =select(doc,"//*[local-name()='natIp']/text()");
+		console.log("Getting the NAT Rules...");
+	//	console.log(body);
+    if (isOld(dcLocation)) {	
+	   var doc = new dom().parseFromString(body);
+       sourceIpArr = select(doc, "//*[local-name()='sourceIp']/text()");
+       natIpArr =select(doc,"//*[local-name()='natIp']/text()");
+	}else {
+		var sourceIpArr =[];
+		var natIpArr =[];
+		for (i in JSON.parse(body).natRule) {
+	       sourceIpArr.push(JSON.parse(body).natRule[i]['internalIp']);
+	       natIpArr.push(JSON.parse(body).natRule[i]['externalIp']);
+		}
+	}
+
     var sip = [];
     var nip = [];
     var sipFromLog = [];
     var sidFromLog = [];
     
     sourceIpArr.forEach(function(sourceIp){
+       if (isOld(dcLocation)) {
     	 sip.push(sourceIp.data);
-    	});
+	   } else {
+		 sip.push(sourceIp);  
+	   }	 
+    });
     natIpArr.forEach(function(natip){
+	   if (isOld(dcLocation)) {
     	 nip.push(natip.data);
-    	});
+	   } else {
+		 nip.push(natip);  
+	   }
+    });
     console.log(sip,nip); 
     for (i in sip) {
-    	externalIpArr[sip[i]] = nip [i]; 
+    	externalIpArr[sip[i]] = nip [i];     //建立sip 和 nip 一对一的关系
     	} 
     console.log(externalIpArr);
     //read the internal ip log from other routine
@@ -407,7 +432,6 @@ function getNatRules(err,res,body){
     sidFromLog = fs.readFileSync(__dirname+"/serverid.log").toString().split(',');
     fs.writeFileSync(__dirname+"/eipaddr.log","");
     fs.writeFileSync(__dirname+"/server.csv","#serverID,publicIP,dataCenter,httpCheck\n");     //#serverID,publicIP,dataCenter,httpCheck\n
-  //  fs.appendFileSync(__dirname+"server.csv","#serverID,publicIP,dataCenter,httpCheck\n");
     for (i=0;i<sipFromLog.length-1;i++){
       fs.appendFileSync(__dirname+"/eipaddr.log",externalIpArr[sipFromLog[i]]+',');	
       fs.appendFileSync(__dirname+"/server.csv",sidFromLog[i]+','+externalIpArr[sipFromLog[i]]+','+dcLocation+','+'yes\n');
@@ -418,19 +442,29 @@ function getNatRules(err,res,body){
   	}
 	}
 
-	
+function isOld(DC){
+	if (DC == 'NA1' || DC == 'NA3' || DC == 'NA5') {
+		return true;
+	} else {
+		return false;
+	}
+}	
 
 //Invoke account api call.
 //request(optionsMyAccount, getMyAccount);
 
 //Get Locations
 //request(options, getLocations);
-var dcLocation = 'NA3';
+var dcLocation = 'NA12';
 var networkDomainId = "";
 var org_id = "e8cd76a3-7bce-4415-9979-be5b558e0dbd";
 var externalIpArr = [];
-//options.url = 'https://api-na.dimensiondata.com/caas/2.1/'+org_id+'/network/networkDomain';
-options.url = 'https://api-na.dimensiondata.com/oec/0.9/'+org_id+'/networkWithLocation/'+dcLocation;
+
+if (isOld(dcLocation)) {
+   options.url = 'https://api-na.dimensiondata.com/oec/0.9/'+org_id+'/networkWithLocation/'+dcLocation;
+} else {
+   options.url = 'https://api-na.dimensiondata.com/caas/2.1/'+org_id+'/network/networkDomain?datacenterId='+dcLocation;
+}
 request(options,getNetworkId);
 
 

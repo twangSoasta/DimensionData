@@ -91,6 +91,8 @@ function getServers(error, response, body) {
  			}
  			//tony added code here to generate instanceid.log(interal ip) and internalid.log 
  			//LG and RS may interleave but we need the all of the LG 1st then RS
+			if (isOld(DATACENTER)) {
+			 //old style return 
  			 nicArr.push(info.server[i]['nic']);
  			 if (info.server[i]['name'] == 'twLG' && info.server[i]['started'] == true ) {
  			 	  insArrLg.push(nicArr[i]['privateIpv4']);
@@ -100,7 +102,19 @@ function getServers(error, response, body) {
  			 		insArrRs.push(nicArr[i]['privateIpv4']);
  			 		idArrRs.push(info.server[i]['id']);	
  			 			}
- 			 		}   
+ 			 		}
+            }else {
+			//new style returns
+				if (info.server[i]['name'] == 'twLG' && info.server[i]['started'] == true ) {
+ 			 	  insArrLg.push(info.server[i]['networkInfo']['primaryNic']['privateIpv4']);
+ 			 	  idArrLg.push(info.server[i]['id']);
+ 			 	} else {
+ 			 		if (info.server[i]['name'] == 'twRS'&& info.server[i]['started'] == true){
+ 			 		insArrRs.push(info.server[i]['networkInfo']['primaryNic']['privateIpv4']);
+ 			 		idArrRs.push(info.server[i]['id']);	
+ 			 			}
+ 			 		}
+			}					
 		 }
 		
 		 fs.writeFileSync(__dirname+'/instanceid.log','');
@@ -118,8 +132,8 @@ function getServers(error, response, body) {
 		 	 fs.appendFileSync(__dirname+'/serverid.log',idArrRs[i]+',');
 		 	}
 		  console.log(insArrLg,insArrRs);
-		  console.log(idArr);
 		  console.log(insArr);
+		  console.log(idArr);
 		  console.log("Internal IP polling is done, instanceid.log and serverid.log are generated");
 
 /*
@@ -154,7 +168,7 @@ function getMyAccount(error, response, body) {
     	log.info('Organization ID: '+organizationId);
     	console.log('Organization ID: '+organizationId);
     	//Invoke Server API
-    	optionsServer.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server';
+    	optionsServer.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server'+'?datacenterId='+DATACENTER;
 		request(optionsServer, getServers);
 	}else{
    		log.info('Received invalid response or error from My Account API...');
@@ -162,12 +176,19 @@ function getMyAccount(error, response, body) {
     }
 
 }
-
+function isOld(DC){
+	if (DC == 'NA1' || DC == 'NA3' || DC == 'NA5') {
+		return true;
+	} else {
+		return false;
+	}
+}
 
 // ------------------MAIN------------------//
 var insArr = [];
 var idArr = [];
 var organizationId ="";
+const DATACENTER = 'NA12';
 //Start processing
 log.info('Invoking Server API on DimensionData cloud...');
 //Invoke account api call.
