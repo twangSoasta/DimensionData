@@ -46,6 +46,18 @@ var optionsServer = {
         'pass': password
     }
 };
+
+var options = {
+        hostname: 'api-na.dimensiondata.com',
+        port: 443,
+        path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/shutdownServer',
+        method: "POST",
+        headers: {
+        	    'Accept':'application/json',
+              'Content-Type':'application/json'
+        	},
+        auth: username+':'+password
+        };
 var log = bunyan.createLogger({
 								name: "serverCatalog",
 								streams: [{
@@ -55,6 +67,7 @@ var log = bunyan.createLogger({
         									count: 10       // keep 10 back copies
    								}]
 							  });
+var https = require('https');
 
 // -------------------FUNCTIONS----------------------//
 
@@ -176,6 +189,20 @@ function getMyAccount(error, response, body) {
     }
 
 }
+
+function stopServers(err,res,body){
+	if (!err && res.statusCode == 200) {
+	   console.log("Getting Valid Response from Stopping Servers...");	
+	   console.log(body);
+		}else {
+		 console.log("Getting Invalid Response from Stopping Servers...");
+		 //console.log(res.statusCode+"\n"+body);		
+		 console.log(err,body);	
+		}
+	
+	}
+
+
 function isOld(DC){
 	if (DC == 'NA1' || DC == 'NA3' || DC == 'NA5') {
 		return true;
@@ -187,11 +214,121 @@ function isOld(DC){
 // ------------------MAIN------------------//
 var insArr = [];
 var idArr = [];
-var organizationId ="";
+var organizationId ="e8cd76a3-7bce-4415-9979-be5b558e0dbd";
+var optionsServer = {
+    url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
+    headers: {
+        'Accept':'application/json',
+        'Content-Type':'application/json'
+    },
+    auth: {   
+        'user': username,
+        'pass': password
+    }
+};
+
 const DATACENTER = 'NA12';
 //Start processing
-log.info('Invoking Server API on DimensionData cloud...');
+//log.info('Invoking Server API on DimensionData cloud...');
 //Invoke account api call.
-request(optionsMyAccount, getMyAccount);
+//request(optionsMyAccount, getMyAccount);
+
+var idArr = fs.readFileSync(__dirname+'/serverid.log').toString().split(',');   
+idArr.splice(idArr.length-1,1);
+
+/*
+//stop servers
+options.path = '/caas/2.0/'+organizationId+'/server/shutdownServer';  
+var logOnce = true;
+if (idArr.length == 0) {  
+	  console.log("Retrieving no server id!");
+   	} else {
+   idArr.forEach(function(id){
+   var postData = {'id':id}; 
+      console.log(options.path +'\n'+JSON.stringify(postData));
+      httpPost(options,postData,function(res,body){
+      	if (res.statusCode == 200) {
+      	//	  console.log('Operation success!');
+      		} else {  
+      			if (logOnce) {
+      			   console.log('Operation returned error, 1st once is:');
+      			   console.log(body); 
+      			   logOnce = false;
+      			 }
+      		}
+      	});
+   });
+
+}
+*/
+
+/*
+//start servers
+options.path = '/caas/2.0/'+organizationId+'/server/startServer';  
+var logOnce = true;
+if (idArr.length == 0) {  
+	  console.log("Retrieving no server id!");
+   	} else {
+   idArr.forEach(function(id){
+   var postData = {'id':id}; 
+      console.log(options.path +'\n'+JSON.stringify(postData));
+      httpPost(options,postData,function(res,body){
+      	if (res.statusCode == 200) {
+      	//	  console.log('Operation success!');
+      		} else {  
+      			if (logOnce) {
+      			   console.log('Operation returned error, 1st once is:');
+      			   console.log(body); 
+      			   logOnce = false;
+      			 }
+      		}
+      	});
+   });
+   
+}
+*/
+
+
+options.path = '/caas/2.0/'+organizationId+'/server/rebootServer';  
+var logOnce = true;
+if (idArr.length == 0) {  
+	  console.log("Retrieving no server id!");
+   	} else {
+   idArr.forEach(function(id){
+   var postData = {'id':id}; 
+      console.log(options.path +'\n'+JSON.stringify(postData));
+      httpPost(options,postData,function(res,body){
+      	if (res.statusCode == 200) {
+      	//	  console.log('Operation success!');
+      		} else {  
+      			if (logOnce) {
+      			   console.log('Operation returned error, 1st once is:');
+      			   console.log(body); 
+      			   logOnce = false;
+      			 }
+      		}
+      	});
+   });
+   
+}
+
+
+function httpPost(options,postData,callback){	
+
+var req = https.request(options, function(res){        
+      var body = "";  
+      res.on('data', function(d){
+     	  body += d;    	        
+      });
+	  res.on('end',function(){
+	     callback(res,body);
+	  });
+});
+
+req.write(JSON.stringify(postData));
+req.end();
+}
+
+
 
 
