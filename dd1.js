@@ -21,6 +21,7 @@ var fs = require('fs');
 var select = require('xpath.js')
       , dom = require('xmldom').DOMParser
 var bunyan = require('bunyan');
+var async = require('async');
 
 // ------------------GLOBAL VARIABLES-----------------//
 var fields_Server = ['name', 'description', 'organization', 'bizUnit', 'wbscode', 'environment', 'timestamp', 'backup.assetId', 'backup.servicePlan', 'monitoring.monitoringId', 'monitoring.servicePlan', 'operatingSystem.id', 'operatingSystem.displayName', 'cpuCount', 'memoryGb', 'disk.sizeGb', 'disk.speed', 'networkInfo.primaryNic.id','networkInfo.primaryNic.vlanId', 'networkInfo.primaryNic.privateIpv4', 'networkInfo.networkDomainId','sourceImageId','id', 'datacenterId'];
@@ -290,6 +291,7 @@ if (idArr.length == 0) {
 
 
 options.path = '/caas/2.0/'+organizationId+'/server/rebootServer';  
+/*
 var logOnce = true;
 if (idArr.length == 0) {  
 	  console.log("Retrieving no server id!");
@@ -311,6 +313,36 @@ if (idArr.length == 0) {
    });
    
 }
+*/
+
+var logOnce = true;
+if (idArr.length == 0) {  
+	  console.log("Retrieving no server id!");
+   	} else {
+       async.forEach(idArr, function (id, callback) {
+          var postData = {'id':id}; 
+          console.log(options.path +'\n'+JSON.stringify(postData));
+          httpPost(options,postData,function(res,body){
+      	  if (res.statusCode == 200) {
+      	  //	  console.log('Operation success!');
+      		} else {  
+      			if (logOnce) {
+      			   console.log('Operation returned error, 1st once is:');
+      			   console.log(body); 
+      			   logOnce = false;
+      			 }
+      		 }
+      	  });
+      	  callback();
+      	}, function(err){
+      		console.log("all done");
+      		
+      		});
+       	
+    }
+
+
+
 
 
 function httpPost(options,postData,callback){	

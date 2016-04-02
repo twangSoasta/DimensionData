@@ -36,7 +36,9 @@ var rsNum = 1;
 //added for DimensionData
 var insArr = [];
 var idArr = [];
+var externalIpArr =[];
 var organizationId ="e8cd76a3-7bce-4415-9979-be5b558e0dbd";
+var networkDomainId = "";
 //  -----------------NPM DEPENDENCIES------------------//
 var request = require('request');
 var json2csv = require('json2csv');
@@ -58,7 +60,7 @@ var optionsMyAccount = {
         'pass': password
     }
 };
-var optionsServer = {
+var optionsNetowrk = {
     url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
     headers: {
         'Accept':'application/json'
@@ -245,15 +247,43 @@ var server = http.createServer(function(req,res){
              mod = NUM - div*10;        
 				     console.log(NUM,div,mod);
 	   	   		 res.write("DataCenter location is: "+zoneDc);
+	   	   		 var optionsNetowrk = {
+                url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
+                headers: {
+                   'Accept':'application/json'
+                },
+                auth: {   
+                   'user': username,
+                   'pass': password
+                }
+             };            
 	   	   		 if (isOld(zoneDc)){
-	   	   		    res.write(' and it is MCP 0.9 style');
+	   	   		    res.write(' and it is MCP 0.9 style<br \>');
+	   	   		    optionsNetowrk.url = 'https://api-na.dimensiondata.com/oec/0.9/'+organizationId+'/networkWithLocation/'+zoneDc;
 	   	   		 	} else {
-	   	   		 		res.write(' and it is MCP 2.0 style');
+	   	   		 		res.write(' and it is MCP 2.0 style<br \>');
+	   	   		 		optionsNetowrk.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/network/networkDomain?datacenterId='+zoneDc;
 	   	   		 		}
-				     var inputBoxStr = body.substring(body.indexOf('="65">')+6,body.lastIndexOf("</textarea>"));
-				     body = body.replace(inputBoxStr,numOfInstances+","+eipBandwidth+","+zoneDc+","+instanceType+","+imageId+","+imageIdRS+","+path);
-				     fs.writeFileSync(__dirname+"/inputtextDD.log",numOfInstances+','+eipBandwidth+','+zoneDc+','+instanceType+','+imageId+','+imageIdRS+','+path);   //every submit save for the default input text next time start the program
-	   	   		 res.end(body);   	   		
+             request(optionsNetowrk,function(error,response,resbody){
+             	  if (!error && response.statusCode == 200) {
+              		console.log("Getting the Network ID..."+resbody);
+              		var doc = new dom().parseFromString(resbody);
+              	  if (isOld(zoneDc)){
+                     networkDomainId = select(doc, "//*[local-name()='id']/text()")[0].data;
+              	  } else {
+              	     networkDomainId = JSON.parse(resbody).networkDomain[0].id;
+              	  }
+                  console.log('networkDomainId ID: '+networkDomainId); 
+                  res.write('networkDomainId ID: '+networkDomainId);                           	               	  
+	   	   		     }else {
+		               console.log(error);
+		               res.write(error.toString());
+                 }
+                 var inputBoxStr = body.substring(body.indexOf('="65">')+6,body.lastIndexOf("</textarea>"));
+				         body = body.replace(inputBoxStr,numOfInstances+","+eipBandwidth+","+zoneDc+","+instanceType+","+imageId+","+imageIdRS+","+path);
+				         fs.writeFileSync(__dirname+"/inputtextDD.log",numOfInstances+','+eipBandwidth+','+zoneDc+','+instanceType+','+imageId+','+imageIdRS+','+path);   //every submit save for the default input text next time start the program
+	   	   		     res.end(body);
+	   	   	   });
 	   	   break;
 	/*   	   
 	   	   case "/create_LG" : 
@@ -436,36 +466,88 @@ var server = http.createServer(function(req,res){
         });
 		   
 		   break;
-/*		   
-		   case "/describe_eip" : 
-		      
-            command2Qc.command2Qc(jsonObj[pathName],method,uri,secret,function(resObj){
-		    res.write("describe eip =======> ");
-            if ( resObj.eip_set == undefined) {
-           	  res.write("API returns nothing, check your API keys!<br />");
-           	} else { 
-            	var eipSetLength = resObj.eip_set.length;
-            	var eipArr = [];
-            	if (OVERWRITE_FILE){
-            	fs.writeFileSync(__dirname+'/eipid.log',""); 
-            	fs.writeFileSync(__dirname+'/eipaddr.log',""); 
-            	}
-            	   resObj.eip_set.forEach(function(eipObj){
-            		  if (eipObj.eip_name === "twEIP" && (eipObj.status === "available" || eipObj.status === "associated")) {
-            			  eipArr.push(eipObj.eip_addr);
-            			  fs.appendFileSync(__dirname+'/eipid.log',eipObj.eip_id+','); 
-            	          fs.appendFileSync(__dirname+'/eipaddr.log',eipObj.eip_addr+','); 
-            		  }	  
-            	   });
-            	   console.log("eipArr:\n",eipArr); 
-            	   res.write("Total "+eipArr.length.toString()+ " EIPs created: "+eipArr.toString()+"<br />");	
-            	}
-				    res.write(resObj.status);	
-                    res.end(body);
-            });
 		   
+		   case "/describe_eip" : 
+		        var optionsNetowrk = {
+                url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
+                headers: {
+                   'Accept':'application/json'
+                },
+                auth: {   
+                   'user': username,
+                   'pass': password
+                }
+             };
+		        res.write("describe eip =======> ");
+            if (isOld(zoneDc)) {
+               optionsNetowrk.url = 'https://api-na.dimensiondata.com/oec/0.9/'+organizationId+'/network/'+networkDomainId+'/natrule';
+            } else {
+               optionsNetowrk.url = 'https://api-na.dimensiondata.com/caas/2.1/'+organizationId+'/network/natRule?networkDomainId='+networkDomainId;
+            }   
+            request(optionsNetowrk,function(error,response,resbody){
+            
+            if (!error && response.statusCode == 200) {
+            		console.log("Getting the NAT Rules...");
+                if (isOld(zoneDc)) {	
+            	   var doc = new dom().parseFromString(resbody);
+                   sourceIpArr = select(doc, "//*[local-name()='sourceIp']/text()");
+                   natIpArr =select(doc,"//*[local-name()='natIp']/text()");
+            	  }else {
+            		var sourceIpArr =[];
+            		var natIpArr =[];
+            		for (i in JSON.parse(resbody).natRule) {
+            	       sourceIpArr.push(JSON.parse(resbody).natRule[i]['internalIp']);
+            	       natIpArr.push(JSON.parse(resbody).natRule[i]['externalIp']);
+            		}
+            	  }
+            
+                var sip = [];
+                var nip = [];
+                var sipFromLog = [];
+                var sidFromLog = [];
+                
+                sourceIpArr.forEach(function(sourceIp){
+                   if (isOld(zoneDc)) {
+                	 sip.push(sourceIp.data);
+            	   } else {
+            		 sip.push(sourceIp);  
+            	   }	 
+                });
+                natIpArr.forEach(function(natip){
+            	   if (isOld(zoneDc)) {
+                	 nip.push(natip.data);
+            	   } else {
+            		 nip.push(natip);  
+            	   }
+                });
+                console.log(sip,nip); 
+                for (i in sip) {
+                	externalIpArr[sip[i]] = nip [i];     //sip  nip 
+                	} 
+                nip = [];  //reuse for re-ordered listing
+                console.log("externalIpArr is:");
+                console.log(externalIpArr);
+                //read the internal ip log from other routine
+                sipFromLog = fs.readFileSync(__dirname+"/instanceid.log").toString().split(',');
+                sidFromLog = fs.readFileSync(__dirname+"/serverid.log").toString().split(',');
+                fs.writeFileSync(__dirname+"/eipaddr.log","");
+                fs.writeFileSync(__dirname+"/server.csv","#serverID,publicIP,dataCenter,httpCheck\n");     //#serverID,publicIP,dataCenter,httpCheck\n
+                for (i=0;i<sipFromLog.length-1;i++){
+                	nip.push(externalIpArr[sipFromLog[i]]);
+                  fs.appendFileSync(__dirname+"/eipaddr.log",externalIpArr[sipFromLog[i]]+',');	
+                  fs.appendFileSync(__dirname+"/server.csv",sidFromLog[i]+','+externalIpArr[sipFromLog[i]]+','+zoneDc+','+'yes\n');
+                	}	
+                console.log("eipadd.log and server.csv are generated!");
+                res.write("Total "+nip.length+ " external IPs created: "+nip.toString()+"<br />");
+                } else {
+              	   res.write('Received invalid response or error from Server API...');
+                   res.write(JSON.stringify(response));
+              	}	
+              	res.end(body);                                   
+            });     			                        
+                   		       
 		   break;
-*/		   
+		   
 /*		   
 		   case "/associate_eip" :                //need to call the request in a loop, only invoke res.end once
 		      res.write("associate eip<br />");
@@ -496,66 +578,126 @@ var server = http.createServer(function(req,res){
 		   break;
 */	
 
-/*   
+   
 		   case "/stop_instance" : 
-		      
-	   	      
-              var fileInsId = fs.readFileSync(__dirname+'/instanceid.log').toString();
-              var insId = fileInsId.split(',');
-			  var bodytxt ="";
-              for (i=0; i< insId.length -1;i++){
-              		var newName = ("instances."+ (i+1)).toString();
-              		bodytxt += "&" + newName + "=" + insId[i].toString();  	
-              	}
-              var paraQuery = querystring.stringify(jsonObj[pathName]) + bodytxt;
-              var param = querystring.parse(paraQuery);           
-              command2Qc.command2Qc(param,method,uri,secret,function(resObj){  
-			      res.write("Stopping instances<br />");
-                  res.write(resObj.status);	
-                  res.end(body);					  
-              });
-
+		         var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/shutdownServer',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		         options.path = '/caas/2.0/'+organizationId+'/server/shutdownServer';  
+             var logOnce = true;
+             res.write('Stopping Servers...<br \>');
+             if (idArr.length == 0) {  
+             	  console.log("Retrieving no server id!");
+             	  res.write('Retrieving no server id!');
+             	  res.end(body);
+                	} else {
+                res.write("Stopping instances<br />");
+                idArr.forEach(function(id){
+                var postData = {'id':id}; 
+                console.log(options.path +'\n'+JSON.stringify(postData));
+                httpPost(options,postData,function(response,resbody){	                   	  
+                   			if (logOnce) {
+                   				 res.write(resbody);
+                   				 res.end(body);
+                   			   console.log(resbody);                   			   
+                   			   logOnce = false;
+                   			 }
+                   		
+                   	});
+                });   //end of forEach   
+                      
+              }
+           
 		     break;
 		   
 		   case "/start_instance" : 
 		      
-              var fileInsId = fs.readFileSync(__dirname+'/instanceid.log').toString();
-              var insId = fileInsId.split(',');
-			  var bodytxt ="";
-              for (i=0; i< insId.length -1;i++){
-              		var newName = ("instances."+ (i+1)).toString();
-              		bodytxt += "&" + newName + "=" + insId[i].toString();  	
-              	}
-              var paraQuery = querystring.stringify(jsonObj[pathName]) + bodytxt;
-              var param = querystring.parse(paraQuery);           
-              command2Qc.command2Qc(param,method,uri,secret,function(resObj){  
-			      res.write("Starting instances<br />");
-                  res.write(resObj.status);	
-                  res.end(body);				  
-              });
-
-		   break;
+              var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/startServer',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		         options.path = '/caas/2.0/'+organizationId+'/server/startServer';  
+             var logOnce = true;
+             res.write('Stopping Servers...<br \>');
+             if (idArr.length == 0) {  
+             	  console.log("Retrieving no server id!");
+             	  res.write('Retrieving no server id!');
+             	  res.end(body);
+                	} else {
+                res.write("Stopping instances<br />");
+                idArr.forEach(function(id){
+                var postData = {'id':id}; 
+                console.log(options.path +'\n'+JSON.stringify(postData));
+                httpPost(options,postData,function(response,resbody){	                   	  
+                   			if (logOnce) {
+                   				 res.write(resbody);
+                   				 res.end(body);
+                   			   console.log(resbody);                   			   
+                   			   logOnce = false;
+                   			 }
+                   		
+                   	});
+                });   //end of forEach   
+                      
+              }
+           
+		     break;
 		   
 		   case "/restart_instance" : 
 		      
-              var fileInsId = fs.readFileSync(__dirname+'/instanceid.log').toString();
-              var insId = fileInsId.split(',');
-			  var bodytxt = "";
-              for (i=0; i< insId.length -1;i++){
-              		var newName = ("instances."+ (i+1)).toString();
-              		bodytxt += "&" + newName + "=" + insId[i].toString();  	
-              	}
-              var paraQuery = querystring.stringify(jsonObj[pathName]) + bodytxt;
-              var param = querystring.parse(paraQuery);
-              command2Qc.command2Qc(param,method,uri,secret,function(resObj){
-				  res.write("Restarting instances<br />");
-				  res.write(resObj.status);	
-                  res.end(body);	
-              	
-              });
-              	   
-		   break;
-*/		   
+              var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/rebootServer',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		         options.path = '/caas/2.0/'+organizationId+'/server/rebootServer';  
+             var logOnce = true;
+             res.write('Stopping Servers...<br \>');
+             if (idArr.length == 0) {  
+             	  console.log("Retrieving no server id!");
+             	  res.write('Retrieving no server id!');
+             	  res.end(body);
+                	} else {
+                res.write("Stopping instances<br />");
+                idArr.forEach(function(id){
+                var postData = {'id':id}; 
+                console.log(options.path +'\n'+JSON.stringify(postData));
+                httpPost(options,postData,function(response,resbody){	                   	  
+                   			if (logOnce) {
+                   				 res.write(resbody);
+                   				 res.end(body);
+                   			   console.log(resbody);                   			   
+                   			   logOnce = false;
+                   			 }
+                   		
+                   	});
+                });   //end of forEach   
+                      
+              }
+           
+		     break;
+	   
 /*		   
 		   case "/dissociate_eip" : 
 		      
@@ -711,3 +853,4 @@ var req = https.request(options, function(res){
 req.write(JSON.stringify(postData));
 req.end();
 }
+
