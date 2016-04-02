@@ -211,8 +211,11 @@ var server = http.createServer(function(req,res){
     	           console.log('Organization ID: '+organizationId);
     	           res.write('Organization ID: '+organizationId);    	          
 	            }else{
-   		           res.write('Received invalid response or error from My Account API...<br \>');
-   		           res.write('Status code: '+response.statusCode);
+   		           if (response == null) {
+		                  res.write('Receive No Response from API...Check your credentials or network');
+		               	} else {	               
+		               res.write("Response Code is: "+response.statusCode);
+                   }
               }	
               res.end(body);  			      
 				      });		   
@@ -276,8 +279,11 @@ var server = http.createServer(function(req,res){
                   console.log('networkDomainId ID: '+networkDomainId); 
                   res.write('networkDomainId ID: '+networkDomainId);                           	               	  
 	   	   		     }else {
-		               console.log(error);
-		               res.write(error.toString());
+		               if (response == null) {
+		                  res.write('Receive No Response from API...Check your credentials or network');
+		               	} else {	               
+		               res.write("Response Code is: "+response.statusCode);
+                   }
                  }
                  var inputBoxStr = body.substring(body.indexOf('="65">')+6,body.lastIndexOf("</textarea>"));
 				         body = body.replace(inputBoxStr,numOfInstances+","+eipBandwidth+","+zoneDc+","+instanceType+","+imageId+","+imageIdRS+","+path);
@@ -459,8 +465,11 @@ var server = http.createServer(function(req,res){
 		           res.write("Total "+insArr.length+ " instances created: "+insArrLg.toString()+"###"+insArrRs.toString()+"<br />");
 		           res.write(idArr.toString());
 		        }else{
-    	         res.write('Received invalid response or error from Server API...');
-               res.write(JSON.stringify(response));
+    	         if (response == null) {
+		                  res.write('Receive No Response from API...Check your credentials or network');
+		               	} else {	               
+		               res.write("Response Code is: "+response.statusCode);
+                   }
             }        	
             res.end(body);		 
         });
@@ -540,8 +549,11 @@ var server = http.createServer(function(req,res){
                 console.log("eipadd.log and server.csv are generated!");
                 res.write("Total "+nip.length+ " external IPs created: "+nip.toString()+"<br />");
                 } else {
-              	   res.write('Received invalid response or error from Server API...');
-                   res.write(JSON.stringify(response));
+              	   if (response == null) {
+		                  res.write('Receive No Response from API...Check your credentials or network');
+		               	} else {	               
+		               res.write("Response Code is: "+response.statusCode);
+                   }
               	}	
               	res.end(body);                                   
             });     			                        
