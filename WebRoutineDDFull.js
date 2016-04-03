@@ -1,11 +1,9 @@
 /*************************************************************************************************************************************
-Title: WebRoutineDD.js
+Title: WebRoutineDDFull.js
 Description: Top level module for DimensionData API
 Author: Tony Wang
 Version: 
-0.9 - 1st stable version function implemented: 1.0 and 2.0 support for describe instance, describe ip, start/stop/reboot 
-0.9.1 - added try/catch for networkID proteciton, added one more request after networkdomainId in the upload logic
-      - changed postData to postD in the server request logic
+0.9 - 1st version based on WebRoutineDD to support full operation for MCP 2.0 
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -15,6 +13,7 @@ var url = require('url');
 var zlib = require('zlib');
 var zip = require('node-native-zip');
 var mime = require('mime');
+var async = require('async');
 //var formidable = require('formidable');
 var generateXML = require('./GenerateXML.js');
 var host = "0.0.0.0";
@@ -119,7 +118,7 @@ var body = '<html>'+
     '</style>'+
     '</head>'+
     '<body>'+  
-	'<h1>Welcome to use NodeJs Routine for DimensionData API v0.9.1</h1>'+
+	'<h1>Welcome to use NodeJs Routine for DimensionData API v0.9.0</h1>'+
 	'<form enctype="multipart/form-data" action="/UploadKeyCSV" method="post">'+
     '<input type="file" name ="upload" id="choosefile" /><br>'+
     '<input type="submit" value="UploadKeyCSV" id="submitBtn" />'+
@@ -132,16 +131,19 @@ var body = '<html>'+
 //    '<textarea name="text" rows="2" cols="65">2,10,pek2,c4m8,img-1wbv1ydv,img-wska67bq,Beijing Qingcloud Loc #2</textarea>'+
     '<textarea name="text" rows="2" cols="65">'+inputTextArr[0]+','+inputTextArr[1]+','+inputTextArr[2]+','+inputTextArr[3]+','+inputTextArr[4]+','+inputTextArr[5]+','+inputTextArr[6]+'</textarea>'+
     '<input type="submit" value="Submit" style="height:20px;width:80px" />'+
+    '</form>'+ 
+	'<form action="/create_NetworkVlan" method="post">'+           
+	'<input type="submit" value="Create_netvlan" style="height:20px;width:120px" />'+
     '</form>'+
-/*    '<form action="/create_LG" method="post">'+           
-	  '<input type="submit" value="Create_lg" style="height:20px;width:120px;background:#FFC0CB" />'+
+    '<form action="/create_LG" method="post">'+           
+	'<input type="submit" value="Create_lg" style="height:20px;width:120px;background:#FFC0CB" />'+
     '</form>'+
-	  '<form action="/create_RS" method="post">'+           
-	  '<input type="submit" value="Create_rs" style="height:20px;width:120px;background:#FFC0CB" />'+
+	'<form action="/create_RS" method="post">'+           
+	'<input type="submit" value="Create_rs" style="height:20px;width:120px;background:#FFC0CB" />'+
     '</form>'+
 	'<form action="/create_eip" method="post">'+           
 	'<input type="submit" value="Create_eip" style="height:20px;width:120px;background:#FFC0CB" />'+
-    '</form>'+ */
+    '</form>'+ 
 	'<form action="/describe_instance" method="post">'+           
 	'<input type="submit" value="Describe_instance" style="height:20px;width:120px;background:#CAFF70" />'+
     '</form>'+
@@ -150,7 +152,10 @@ var body = '<html>'+
     '</form>'+
 /*	'<form action="/associate_eip" method="post">'+           
 	'<input type="submit" value="Associate_eip" style="height:20px;width:120px;background:#EEEE00" />'+
-    '</form>'+  */
+    '</form>'+  */  
+	'<form action="/describe_natrules" method="post">'+           
+	'<input type="submit" value="Describe_natrules" style="height:20px;width:120px;background:#EEEE00" />'+
+    '</form>'+ 
 	'<form action="/stop_instance" method="post">'+           
 	'<input type="submit" value="Stop_instance" style="height:20px;width:120px;background:#EECFA1" />'+
     '</form>'+
@@ -237,7 +242,7 @@ var server = http.createServer(function(req,res){
 		         //the following variables are global variables, can't use var here
              inputArr = finalTxt.split(',');
              console.log(inputArr);
-		         numOfInstances = (inputArr[0] == null || inputArr[0] == '')?parseInt(inputTextArr[0]):parseInt(inputArr[0]);
+		     numOfInstances = (inputArr[0] == null || inputArr[0] == '')?parseInt(inputTextArr[0]):parseInt(inputArr[0]);
              div50 = Math.floor(numOfInstances/50);
              mod50 = numOfInstances - div50*50;
              rsNum = (mod50 == 0)? div50:div50+1;
@@ -327,104 +332,255 @@ var server = http.createServer(function(req,res){
 			     });
 	   	   	   });
 	   	   break;
-	/*   	   
+		   
+		   case "/create_NetworkVlan":
+		       var optionsNetwork = {
+                url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
+                headers: {
+                   'Accept':'application/json'
+                },
+                auth: {   
+                   'user': username,
+                   'pass': password
+                }
+              };
+			  var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/shutdownServer',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		      options.path = '/caas/2.0/'+organizationId+'/network/deployNetworkDomain';
+			  var postData = {
+                              "datacenterId": zoneDc,
+                              "name": "SOASTA Domain",
+                              "description": "SOASTA Test Domain",
+                              "type": "ESSENTIALS"
+                              };
+			  httpPost(options,postData,function(response,resbody){			  
+			     res.write('Create a Network Domain,  ');
+				 optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/network/networkDomain?datacenterId='+zoneDc;
+				 request(optionsNetwork,function(error,response,resbody){
+					console.log(resbody);
+				    try {networkDomainId = JSON.parse(resbody).networkDomain[0].id;} catch(e){console.log(e);res.write('NetworkDomainId does not exist, create it 1st!  ');}
+					console.log('networkDomainId ID: '+networkDomainId); 
+                    res.write('networkDomainId ID: '+networkDomainId+'  ');
+					options.path = '/caas/2.0/'+organizationId+'/network/deployVlan';
+					var postData = {
+                                    "networkDomainId": networkDomainId,
+                                    "name": "SOASTA VLAN",
+                                    "description": "SOASTA Test Vlan",
+                                    "privateIpv4BaseAddress": "10.0.0.0",
+                                    "privateIpv4PrefixSize": 23
+                                    };
+					setTimeout(httpPost(options,postData,function(response,resbody){	
+					   console.log(resbody);
+				       res.write("Create a Vlan 10.0.0.0/23,   ");
+					   optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/network/vlan?datacenterId='+zoneDc;	   	   	   	 	
+			           request(optionsNetwork,function(error,response,resbody){
+					      try {vlanId = JSON.parse(resbody).vlan[0].id;} catch(e){console.log(e);res.write('VLANID does not exist, create it 1st!  ');}   
+						  console.log('VLAN ID: '+vlanId); 
+                          res.write('VLAN ID: '+vlanId); 
+						  res.end(body);
+					   }); //end of getVlan
+					}),15000); // end of deployVlan
+			     });  //end of getNetwork
+			  });  //end of deploy Network
+		   break;
+	  	   
 	   	   case "/create_LG" : 
 	   	       console.log(mod+" "+numOfInstances+" "+eipBandwidth+" "+zoneDc+" "+instanceType+" "+imageId+" "+imageIdRS+" "+path);		         
-		         var modJsonInsLG = 
-				         {"count":mod,
-                  "image_id":imageId,
-                  "instance_type":instanceType,
-                  "zone":zoneDc,
-                  "instance_name":"twLG",
-                  "login_mode":"passwd",
-                  "login_passwd":"Soasta2006",
-                  "vxnets.1":"vxnet-0",
-                  "signature_version":1,                     
-                  "signature_method":"HmacSHA256",              
-                  "version":1,                              
-                  "access_key_id":access_key_id,   
-                  "action":"RunInstances",            
-                  "time_stamp":"2013-08-27T14:30:10Z"};
-                                
-	   	   		 
-				     var myParameterCreateArr = [];   //used for Async loop 
-             for (i=0; i<div;i++) {				 
-					      myParameterCreateArr.push(jsonObj[pathName]);
-					   }
-             myParameterCreateArr.push(modJsonInsLG);
-				     myParameterCreateArr.forEach(function(myParameterCreate){
-                 command2Qc.command2Qc(myParameterCreate,method,uri,secret,function(resObj){ 
-				    res.write("Creating LG in progress<br />");
-                    res.write(resObj.status);	
-                    res.end(body);					
-                    });
-             }); 
-             LGDone = true; 
+		         var postData = 
+				         {
+                          "name":"twLG",
+                          "description":"twLG",
+                          "imageId":"4f472de5-3031-421b-add6-8573b0b03146",
+                          "start":true,
+                 //         "administratorPassword":"Soasta2006",
+                          "cpu":{
+                          "count":2,
+                          "coresPerSocket":1,
+                          "speed":"STANDARD"
+                          },
+                          "memoryGb":8,
+                          "primaryDns":"",
+                          "secondaryDns":"",
+                          "networkInfo": {
+                          "networkDomainId":networkDomainId,
+                          "primaryNic" : {"vlanId":vlanId}
+						//  "additionalNic" : [
+                        //     {"privateIpv4" : ""},
+                        //     {"vlanId":""}
+                        //     ]
+                          },
+                          "disk" : [{
+                          "scsiId" :"0" ,
+                          "speed" :"STANDARD"   //HIGHPERFORMANCE
+                          }],
+                          "microsoftTimeZone":"035"
+                          }
+				var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/deployServer',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		         options.path = '/caas/2.0/'+organizationId+'/server/deployServer';  
+             var logOnce = true;
+             if (!(NUM > 0)) {  
+             	  console.log("Number of LGs is invalid! "+NUM);
+             	  res.write('Number of LGs is invalid! '+NUM);
+             	  res.end(body);
+                	} else {
+                res.write("Creating LGs<br />");
+				LGDone = true;
+				var j = [];
+				for (i=0;i<NUM;i++){j.push(NUM);}
+                async.forEach(j, function (item, callback) {
+                   httpPost(options,postData,function(response,resbody){	
+                            console.log(resbody);				
+                   			if (logOnce) {
+                   				 res.write(resbody);
+                   				 res.end(body);                 			   
+                   			     logOnce = false;
+                   			 }
+							 optionsServer = {
+                                 url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
+                                 headers: {
+                                    'Accept':'application/json'
+                                 },
+                                 auth: {   
+                                    'user': username,
+                                    'pass': password
+                                 }
+                              };	
+                             optionsServer.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server'+'?datacenterId='+zoneDc;
+		                     request(optionsServer, function(error,response,resbody){						 
+								  callback();
+					    	 });
+                   	});					
+                },function(err){
+      		        console.log("all done");    		
+      		    });   //end of forEach                         
+			}
+			  
 	   	   break;
 	   	   
 	   	   case "/create_RS":
-	   	      console.log("rsNum: "+rsNum);
+	   	        var postData = 
+				         {
+                          "name":"twLG",
+                          "description":"twLG",
+                          "imageId":"4f472de5-3031-421b-add6-8573b0b03146",
+                          "start":true,
+                 //         "administratorPassword":"Soasta2006",
+                          "cpu":{
+                          "count":2,
+                          "coresPerSocket":1,
+                          "speed":"STANDARD"
+                          },
+                          "memoryGb":8,
+                          "primaryDns":"",
+                          "secondaryDns":"",
+                          "networkInfo": {
+                          "networkDomainId":networkDomainId,
+                          "primaryNic" : {"vlanId":vlanId}
+						//  "additionalNic" : [
+                        //     {"privateIpv4" : ""},
+                        //     {"vlanId":""}
+                        //     ]
+                          },
+                          "disk" : [{
+                          "scsiId" :"0" ,
+                          "speed" :"STANDARD"   //HIGHPERFORMANCE
+                          }],
+                          "microsoftTimeZone":"035"
+                          }
+				postData.name = "twRS";
+			    postData.imageID = "939feda5-018b-4520-9634-e6750be1218a";		  
 		        if (!LGDone) {
 		      	    res.write("Needs LG number to determine RS number, please go back and create some LGs 1st!");
 					res.end(body);	
 		      	 } else {
-		        var modJsonInsRS = 
-				         {"count":rsNum,
-                  "image_id":imageIdRS,
-                  "instance_type":instanceType,
-                  "zone":zoneDc,
-                  "instance_name":"twRS",
-                  "login_mode":"passwd",
-                  "login_passwd":"Soasta2006",
-                  "vxnets.1":"vxnet-0",
-                  "signature_version":1,                     
-                  "signature_method":"HmacSHA256",              
-                  "version":1,                              
-                  "access_key_id":access_key_id,   
-                  "action":"RunInstances",            
-                  "time_stamp":"2013-08-27T14:30:10Z"};
-		        command2Qc.command2Qc(modJsonInsRS,method,uri,secret,function(resObj){  
-				    res.write("Creating RS in progress<br />");
-                    res.write(resObj.status);	
-                    res.end(body);						
-                    });
-            LGDone = false;
-            }
+				LGDone = false;
+				console.log("rsNum: "+rsNum);
+		        var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/deployServer',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		         options.path = '/caas/2.0/'+organizationId+'/server/deployServer';  
+             var logOnce = true;
+             if (!(rsNum > 0)) {  
+             	  console.log("Number of LGs is invalid! "+NUM);
+             	  res.write('Number of LGs is invalid! '+NUM);
+             	  res.end(body);
+                	} else {
+                res.write("Creating RSs<br />");
+                for (i=0;i<rsNum;i++){
+               // console.log(options.path +'\n'+JSON.stringify(postData));
+                httpPost(options,postData,function(response,resbody){	                   	  
+                   			if (logOnce) {
+                   				 res.write(resbody);
+                   				 res.end(body);
+                   			   console.log(resbody);                   			   
+                   			   logOnce = false;
+                   			 }                 		
+                   	});
+                 };   //end of forEach         
+			   }
+		     }	
+
 		     break;
 	   	   	 
 	   	  
 		   case "/create_eip" : 
 		    NUM = parseInt(numOfInstances)+rsNum;	   //assuming upload will always happen before create
-			  div = Math.floor(NUM/10);
-        mod = NUM - div*10;        
-			  console.log("Eips number: "+NUM+" "+div+" "+mod);
-			  var modJsonEip =  
-				   {"count":mod,
-            "bandwidth":eipBandwidth,
-            "billing_mode":"traffic",
-            "eip_name":"twEIP",
-            "zone":zoneDc,
-            "signature_version":1,                     
-            "signature_method":"HmacSHA256",              
-            "version":1,                              
-            "access_key_id":access_key_id,   
-            "action":"AllocateEips",            
-            "time_stamp":"2013-08-27T14:30:10Z"};
-                var myParameterCreateArr = [];   //used for Async loop
-                for (i=0; i<div;i++) {
-					 myParameterCreateArr.push(jsonObj[pathName]);
-					}
-				 myParameterCreateArr.push(modJsonEip);
-				 myParameterCreateArr.forEach(function(myParameterCreate){
-                 command2Qc.command2Qc(myParameterCreate,method,uri,secret,function(resObj){   
-				    res.write("Creating eips in progress<br />");
-                    res.write(resObj.status);	
-                    res.end(body);					 
-                  });
-                 });  
+			div = Math.floor(NUM/10);
+            mod = NUM - div*10;        
+			console.log("Eips number: "+NUM+" "+div+" "+mod);
+			var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/deployServer',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+				var logOnce = true;
+		        options.path = '/caas/2.0/'+organizationId+'/network/addPublicIpBlock'; 
+                var postData = 	{"networkDomainId": networkDomainId};		
+            	httpPost(options,postData,function(response,resbody){	  
+                			res.write("Creating External IP address..."+logOnce);	
+                   			if (logOnce) {
+                   				 res.write(resbody);
+                   				 res.end(body);
+                   			   console.log(resbody);             			   
+                   			   logOnce = false;
+                   			 }               		
+                   	});			 
            		   
 		   break;
-	*/	   
+		   
 		   case "/describe_instance" : 
 		       optionsServer = {
               url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
@@ -511,8 +667,10 @@ var server = http.createServer(function(req,res){
         });
 		   
 		   break;
+
+//optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.1/'+organizationId+'/network/publicIpBlock?datacenterId='+zoneDc;
 		   
-		   case "/describe_eip" : 
+		   case "/describe_natrules" : 
 		        var optionsNetwork = {
                 url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
                 headers: {
