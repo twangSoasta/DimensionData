@@ -1,3 +1,12 @@
+/*************************************************************************************************************************************
+Title: WebRoutineDD.js
+Description: Top level module for DimensionData API
+Author: Tony Wang
+Version: 
+0.9 - 1st stable version function implemented: 1.0 and 2.0 support for describe instance, describe ip, start/stop/reboot 
+0.9.1 - added try/catch for networkID proteciton, added one more request after networkdomainId in the upload logic
+
+**************************************************************************************************************************************/
 var http = require('http');
 var https = require('https');
 var fs = require('fs');
@@ -39,6 +48,7 @@ var idArr = [];
 var externalIpArr =[];
 var organizationId ="e8cd76a3-7bce-4415-9979-be5b558e0dbd";
 var networkDomainId = "";
+var vlanId = "";
 //  -----------------NPM DEPENDENCIES------------------//
 var request = require('request');
 var json2csv = require('json2csv');
@@ -60,7 +70,7 @@ var optionsMyAccount = {
         'pass': password
     }
 };
-var optionsNetowrk = {
+var optionsNetwork = {
     url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
     headers: {
         'Accept':'application/json'
@@ -108,7 +118,7 @@ var body = '<html>'+
     '</style>'+
     '</head>'+
     '<body>'+  
-	'<h1>Welcome to use NodeJs Routine for DimensionData API v0.9</h1>'+
+	'<h1>Welcome to use NodeJs Routine for DimensionData API v0.9.1</h1>'+
 	'<form enctype="multipart/form-data" action="/UploadKeyCSV" method="post">'+
     '<input type="file" name ="upload" id="choosefile" /><br>'+
     '<input type="submit" value="UploadKeyCSV" id="submitBtn" />'+
@@ -250,7 +260,9 @@ var server = http.createServer(function(req,res){
              mod = NUM - div*10;        
 				     console.log(NUM,div,mod);
 	   	   		 res.write("DataCenter location is: "+zoneDc);
-	   	   		 var optionsNetowrk = {
+				 networkDomainId = "";
+				 vlanId = "";
+	   	   		 var optionsNetwork = {
                 url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
                 headers: {
                    'Accept':'application/json'
@@ -261,23 +273,24 @@ var server = http.createServer(function(req,res){
                 }
              };            
 	   	   		 if (isOld(zoneDc)){
-	   	   		    res.write(' and it is MCP 0.9 style<br \>');
-	   	   		    optionsNetowrk.url = 'https://api-na.dimensiondata.com/oec/0.9/'+organizationId+'/networkWithLocation/'+zoneDc;
+	   	   		    res.write(' and it is MCP 0.9 style, no VLANID supported<br \>');
+	   	   		    optionsNetwork.url = 'https://api-na.dimensiondata.com/oec/0.9/'+organizationId+'/networkWithLocation/'+zoneDc;
 	   	   		 	} else {
 	   	   		 		res.write(' and it is MCP 2.0 style<br \>');
-	   	   		 		optionsNetowrk.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/network/networkDomain?datacenterId='+zoneDc;
-	   	   		 		}
-             request(optionsNetowrk,function(error,response,resbody){
+	   	   		 		optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/network/networkDomain?datacenterId='+zoneDc;
+	   	   		 	}
+		  //get networkdomainID
+             request(optionsNetwork,function(error,response,resbody){
              	  if (!error && response.statusCode == 200) {
               		console.log("Getting the Network ID..."+resbody);
               		var doc = new dom().parseFromString(resbody);
               	  if (isOld(zoneDc)){
-                     networkDomainId = select(doc, "//*[local-name()='id']/text()")[0].data;
+                     try {networkDomainId = select(doc, "//*[local-name()='id']/text()")[0].data;} catch(e){console.log(e);res.write('NetworkDomainId does not exist, create it 1st!  ');}
               	  } else {
-              	     networkDomainId = JSON.parse(resbody).networkDomain[0].id;
+              	     try {networkDomainId = JSON.parse(resbody).networkDomain[0].id;} catch(e){console.log(e);res.write('NetworkDomainId does not exist, create it 1st!  ');}
               	  }
                   console.log('networkDomainId ID: '+networkDomainId); 
-                  res.write('networkDomainId ID: '+networkDomainId);                           	               	  
+                  res.write('networkDomainId ID: '+networkDomainId+'  ');                           	               	  
 	   	   		     }else {
 		               if (response == null) {
 		                  res.write('Receive No Response from API...Check your credentials or network');
@@ -285,10 +298,32 @@ var server = http.createServer(function(req,res){
 		               res.write("Response Code is: "+response.statusCode);
                    }
                  }
+		   //get vlanID	      
+	   	   	   	 optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/network/vlan?datacenterId='+zoneDc;	   	   	   	 	
+			     request(optionsNetwork,function(error,response,resbody){
+                	  if (!error && response.statusCode == 200) {
+                 		console.log("Getting the VLAN ID..."+resbody);
+                 		var doc = new dom().parseFromString(resbody);
+                 	  if (isOld(zoneDc)){
+                        try {vlanId = select(doc, "//*[local-name()='vlan']/text()")[0].data;} catch(e){console.log(e);res.write('VLANID does not exist, create it 1st!  ');}
+                 	  } else {
+                 	     try {vlanId = JSON.parse(resbody).vlan[0].id;} catch(e){console.log(e);res.write('VLANID does not exist, create it 1st!  ');}
+                 	  }
+                     console.log('VLAN ID: '+vlanId); 
+                     res.write('VLAN ID: '+vlanId);                           	               	  
+	   	   	   	     }else {
+		                  if (response == null) {
+		                     res.write('Receive No Response from API...Check your credentials or network');
+		                  	} else {	               
+		                  res.write("Response Code is: "+response.statusCode);
+                      }
+                    }
+                    //get submit text display logic	 
                  var inputBoxStr = body.substring(body.indexOf('="65">')+6,body.lastIndexOf("</textarea>"));
-				         body = body.replace(inputBoxStr,numOfInstances+","+eipBandwidth+","+zoneDc+","+instanceType+","+imageId+","+imageIdRS+","+path);
-				         fs.writeFileSync(__dirname+"/inputtextDD.log",numOfInstances+','+eipBandwidth+','+zoneDc+','+instanceType+','+imageId+','+imageIdRS+','+path);   //every submit save for the default input text next time start the program
-	   	   		     res.end(body);
+				 body = body.replace(inputBoxStr,numOfInstances+","+eipBandwidth+","+zoneDc+","+instanceType+","+imageId+","+imageIdRS+","+path);
+				 fs.writeFileSync(__dirname+"/inputtextDD.log",numOfInstances+','+eipBandwidth+','+zoneDc+','+instanceType+','+imageId+','+imageIdRS+','+path);   //every submit save for the default input text next time start the program
+	   	   		 res.end(body);					
+			     });
 	   	   	   });
 	   	   break;
 	/*   	   
@@ -477,7 +512,7 @@ var server = http.createServer(function(req,res){
 		   break;
 		   
 		   case "/describe_eip" : 
-		        var optionsNetowrk = {
+		        var optionsNetwork = {
                 url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
                 headers: {
                    'Accept':'application/json'
@@ -489,11 +524,11 @@ var server = http.createServer(function(req,res){
              };
 		        res.write("describe eip =======> ");
             if (isOld(zoneDc)) {
-               optionsNetowrk.url = 'https://api-na.dimensiondata.com/oec/0.9/'+organizationId+'/network/'+networkDomainId+'/natrule';
+               optionsNetwork.url = 'https://api-na.dimensiondata.com/oec/0.9/'+organizationId+'/network/'+networkDomainId+'/natrule';
             } else {
-               optionsNetowrk.url = 'https://api-na.dimensiondata.com/caas/2.1/'+organizationId+'/network/natRule?networkDomainId='+networkDomainId;
+               optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.1/'+organizationId+'/network/natRule?networkDomainId='+networkDomainId;
             }   
-            request(optionsNetowrk,function(error,response,resbody){
+            request(optionsNetwork,function(error,response,resbody){
             
             if (!error && response.statusCode == 200) {
             		console.log("Getting the NAT Rules...");
