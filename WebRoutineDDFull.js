@@ -6,6 +6,7 @@ Version:
 0.9 - 1st version based on WebRoutineDD to support full operation for MCP 2.0 
     - added function for create NatVlan/LG/RS/EIP using deasync module
 	- supported all functions, natRuleIdArr,eipBlockIdArr is used no file written yet, image-id and machine size is not yet working
+	- cpuCores,memSize and imageid inputs are working
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -20,7 +21,7 @@ var deasync = require('deasync');
 //var formidable = require('formidable');
 var generateXML = require('./GenerateXML.js');
 var host = "0.0.0.0";
-var port = 8081;
+var port = 8082;
 
 var currentDir = __dirname; 
 var slash = (process.platform == "win32")?"\\":"/";     //detect \ on windows or / on mac/linux
@@ -264,7 +265,15 @@ var server = http.createServer(function(req,res){
              instanceType = instanceType.replace(/\+/g,' '); 
              imageId = imageId.replace(/\+/g,' '); 
              imageIdRS = imageIdRS.replace(/\+/g,' '); 
-				     console.log("path is: "+path);		 
+		     console.log("path is: "+path);	
+             cpuCores = parseInt(instanceType.substring(1,instanceType.indexOf('m')));
+             memSize = parseInt(instanceType.substring(instanceType.indexOf('m')+1));	
+			 console.log(cpuCores,memSize);
+             if (typeof(cpuCores) !== 'number' || typeof(memSize)	!== 'number') {
+				 console.log("Number of CPU and Size of Memory are invalid, please re-enter!");
+				 res.write("Number of CPU and Size of Memory are invalid, please re-enter!");
+			 }		 
+             			 
 				     			 
              NUM = parseInt(numOfInstances);	   //assuming upload will always happen before create
 				     div = Math.floor(NUM/10);
@@ -404,15 +413,15 @@ var server = http.createServer(function(req,res){
 				         {
                           "name":"twLG",
                           "description":"twLG",
-                          "imageId":"54617fa5-adcb-463f-ba9f-c639113dd27f",             //"4f472de5-3031-421b-add6-8573b0b03146",
+                          "imageId":imageId,       //"54617fa5-adcb-463f-ba9f-c639113dd27f",             //"4f472de5-3031-421b-add6-8573b0b03146",
                           "start":true,
                  //         "administratorPassword":"Soasta2006",
                           "cpu":{
-                          "count":2,
+                          "count":cpuCores,
                           "coresPerSocket":1,
                           "speed":"STANDARD"
                           },
-                          "memoryGb":8,
+                          "memoryGb":memSize,
                           "primaryDns":"",
                           "secondaryDns":"",
                           "networkInfo": {
@@ -477,15 +486,15 @@ var server = http.createServer(function(req,res){
 				         {
                           "name":"twLG",
                           "description":"twLG",
-                          "imageId":"4f472de5-3031-421b-add6-8573b0b03146",
+                          "imageId":imageIdRS,     //"4f472de5-3031-421b-add6-8573b0b03146",
                           "start":true,
                  //         "administratorPassword":"Soasta2006",
                           "cpu":{
-                          "count":2,
+                          "count":cpuCores,
                           "coresPerSocket":1,
                           "speed":"STANDARD"
                           },
-                          "memoryGb":8,
+                          "memoryGb":memSize,
                           "primaryDns":"",
                           "secondaryDns":"",
                           "networkInfo": {
@@ -503,7 +512,7 @@ var server = http.createServer(function(req,res){
                           "microsoftTimeZone":"035"
                           }
 				postData.name = "twRS";
-			    postData.imageId = "ca15e9e2-52f2-4609-aae9-5726e6abe96e";             //"939feda5-018b-4520-9634-e6750be1218a";		  
+			    postData.imageId = imageIdRS;   //"ca15e9e2-52f2-4609-aae9-5726e6abe96e";             //"939feda5-018b-4520-9634-e6750be1218a";		  
 		        if (!LGDone) {
 		      	    res.write("Needs LG number to determine RS number, please go back and create some LGs 1st!");
 					res.end(body);	
@@ -1211,8 +1220,9 @@ var req = https.request(options, function(res){
 req.write(JSON.stringify(postData));
 req.end();
 }
-
+/*
 function sleep(sleepTime) {
     for(var start = +new Date; +new Date - start <= sleepTime; ) {} 
 }
+*/
 
