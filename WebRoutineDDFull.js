@@ -5,6 +5,7 @@ Author: Tony Wang
 Version: 
 0.9 - 1st version based on WebRoutineDD to support full operation for MCP 2.0 
     - added function for create NatVlan/LG/RS/EIP using deasync module
+	- supported all functions, natRuleIdArr,eipBlockIdArr is used no file written yet, image-id and machine size is not yet working
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -51,6 +52,8 @@ var externalIpArr =[];
 var organizationId ="e8cd76a3-7bce-4415-9979-be5b558e0dbd";
 var networkDomainId = "";
 var vlanId = "";
+var natRuleIdArr = [];
+var eipBlockIdArr = [];
 //  -----------------NPM DEPENDENCIES------------------//
 var request = require('request');
 var json2csv = require('json2csv');
@@ -152,9 +155,9 @@ var body = '<html>'+
 	'<form action="/describe_eip" method="post">'+           
 	'<input type="submit" value="Describe_eip" style="height:20px;width:120px;background:#CAFF70" />'+
     '</form>'+
-/*	'<form action="/associate_eip" method="post">'+           
+	'<form action="/associate_eip" method="post">'+           
 	'<input type="submit" value="Associate_eip" style="height:20px;width:120px;background:#EEEE00" />'+
-    '</form>'+  */  
+    '</form>'+  
 	'<form action="/describe_natrules" method="post">'+           
 	'<input type="submit" value="Describe_natrules" style="height:20px;width:120px;background:#EEEE00" />'+
     '</form>'+ 
@@ -167,15 +170,15 @@ var body = '<html>'+
 	'<form action="/restart_instance" method="post">'+           
 	'<input type="submit" value="Restart_instance" style="height:20px;width:120px;background:#EECFA1" />'+
     '</form>'+
-/*	'<form action="/dissociate_eip" method="post">'+           
+	'<form action="/dissociate_eip" method="post">'+           
 	'<input type="submit" value="Dissociate_eip" style="height:20px;width:120px;background:#A2B5CD" />'+
-    '</form>'+ */
+    '</form>'+ 
 	'<form action="/delete_instance" method="post">'+           
 	'<input type="submit" value="Delete_instance" style="height:20px;width:120px;background:#A2B5CD" />'+
     '</form>'+
-/*	'<form action="/delete_eip" method="post">'+           
+	'<form action="/delete_eip" method="post">'+           
 	'<input type="submit" value="Delete_eip" style="height:20px;width:120px;background:#A2B5CD" />'+
-    '</form>'+  */
+    '</form>'+  
 	'<form action="/generate_xml" method="post">'+           
 	'<input type="submit" value="Generate_xml" style="height:20px;width:120px;background:#8E388E;color:#FFFFFF" />'+
     '</form>'+
@@ -390,7 +393,7 @@ var server = http.createServer(function(req,res){
                           res.write('VLAN ID: '+vlanId); 
 						  res.end(body);
 					   }); //end of getVlan
-					}),15000); // end of deployVlan
+					}),10000); // end of deployVlan
 			     });  //end of getNetwork
 			  });  //end of deploy Network
 		   break;
@@ -684,8 +687,66 @@ var server = http.createServer(function(req,res){
         });
 		   
 		   break;
-
-//optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.1/'+organizationId+'/network/publicIpBlock?datacenterId='+zoneDc;
+		  
+           case "/describe_eip" :
+		       NUM = parseInt(numOfInstances)+rsNum;
+               var optionsNetwork = {
+                url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
+                headers: {
+                   'Accept':'application/json'
+                },
+                auth: {   
+                   'user': username,
+                   'pass': password
+                }
+               };
+               optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.1/'+organizationId+'/network/publicIpBlock?networkDomainId='+networkDomainId+'&datacenterId='+zoneDc; 	
+               res.write("describe EIPs =======> ");
+			   console.log(optionsNetwork);
+               request(optionsNetwork,function(error,response,resbody){
+			   if (!error && response.statusCode == 200) {
+            		console.log("Getting the EIPs...");   
+					console.log(resbody);
+					var baseEipArr = [];
+					var sizeArr = [];
+					var eipArr = [];
+					eipBlockIdArr = [];
+					for (i in JSON.parse(resbody).publicIpBlock){
+						baseEipArr.push(JSON.parse(resbody).publicIpBlock[i]['baseIp']);				
+						sizeArr.push(JSON.parse(resbody).publicIpBlock[i]['size']);
+						eipBlockIdArr.push(JSON.parse(resbody).publicIpBlock[i]['id']);
+					}
+					console.log(baseEipArr);
+					console.log(sizeArr);
+					console.log(eipBlockIdArr);
+					for (i=0;i<baseEipArr.length;i++){
+						var ipv4Arr = baseEipArr[i].split('.'); 
+						var lastDecimal = parseInt(ipv4Arr[3]); 
+						for (j=0;j<sizeArr[i];j++){
+						   eipArr.push(baseEipArr[i]); 
+						   lastDecimal++;
+						   baseEipArr[i] = ipv4Arr[0]+'.'+ipv4Arr[1]+'.'+ipv4Arr[2]+'.'+lastDecimal.toString();
+						}
+					}
+					console.log(eipArr);
+					res.write("Total "+NUM+" EIP created: ");
+					fs.writeFileSync(__dirname+"/eipaddr.log","");
+					for (i=0;i<NUM;i++){
+                       fs.appendFileSync(__dirname+"/eipaddr.log",eipArr[i]+',');
+					   res.write(eipArr[i]+',');
+                    }					   
+					
+			   }else{
+			      if (response == null) {
+		                  res.write('Receive No Response from API...Check your credentials or network');
+		               	} else {	               
+		               res.write("Response Code is: "+response.statusCode);
+                   }   
+			   } 
+			   res.end(body);
+			   });
+                   				   			   
+           break;		   
 		   
 		   case "/describe_natrules" : 
 		        var optionsNetwork = {
@@ -698,12 +759,15 @@ var server = http.createServer(function(req,res){
                    'pass': password
                 }
              };
-		        res.write("describe eip =======> ");
+		        res.write("describe NAT Rules =======> ");
             if (isOld(zoneDc)) {
                optionsNetwork.url = 'https://api-na.dimensiondata.com/oec/0.9/'+organizationId+'/network/'+networkDomainId+'/natrule';
             } else {
                optionsNetwork.url = 'https://api-na.dimensiondata.com/caas/2.1/'+organizationId+'/network/natRule?networkDomainId='+networkDomainId;
             }   
+			var sourceIpArr = [];
+			var natIpArr = [];
+			natRuleIdArr = [];
             request(optionsNetwork,function(error,response,resbody){
             
             if (!error && response.statusCode == 200) {
@@ -718,7 +782,8 @@ var server = http.createServer(function(req,res){
             		for (i in JSON.parse(resbody).natRule) {
             	       sourceIpArr.push(JSON.parse(resbody).natRule[i]['internalIp']);
             	       natIpArr.push(JSON.parse(resbody).natRule[i]['externalIp']);
-            		}
+					   natRuleIdArr.push(JSON.parse(resbody).natRule[i]['id']); 
+            		}console.log(natRuleIdArr);
             	  }
             
                 var sip = [];
@@ -770,40 +835,60 @@ var server = http.createServer(function(req,res){
             });     			                        
                    		       
 		   break;
-		   
-/*		   
+		   		   
 		   case "/associate_eip" :                //need to call the request in a loop, only invoke res.end once
 		      res.write("associate eip<br />");
-			  var once = true;
-              var fileEipId = fs.readFileSync(__dirname+'/eipid.log').toString();
+              var fileEipId = fs.readFileSync(__dirname+'/eipaddr.log').toString();
               var eipId = fileEipId.split(',');
               var fileInsId = fs.readFileSync(__dirname+'/instanceid.log').toString();
               var insId = fileInsId.split(',');	
               console.log(eipId + "\n" + insId);
+			  var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/network/createNatRule',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		         options.path = '/caas/2.0/'+organizationId+'/network/createNatRule'; 
               if (eipId.length != insId.length) {
               	console.log("Error: EIP number:"+eipId.length," mismatches "+"INSTANCE number:"+insId.length);
 				res.end(body);
               } else {
-              	for (i=0; i< eipId.length -1;i++){
-              		console.log(i);
-              		jsonObj[pathName].eip = eipId[i];
-                    jsonObj[pathName].instance = insId[i];
-              		command2Qc.command2Qc(jsonObj[pathName],method,uri,secret,function(resObj){
-						 if (once == true) {
-						 once = false;
-                         res.write(resObj.status);	
-                         res.end(body);    						 
-						 }
-                         });
-              	}
-               }
-		   
+             var logOnce = true;
+             if (eipId.length == 0) {  
+             	  console.log("Retrieving no external IPs!");
+             	  res.write('Retrieving no external IPs!');
+             	  res.end(body);
+                	} else {
+                res.write("Associate IPs<br />");
+                for (i=0;i<eipId.length-1;i++){
+                   var postData = {
+                                  "networkDomainId": networkDomainId,
+                                  "internalIp" : insId[i], 
+								  "externalIp" : eipId[i]
+                                  };
+                   console.log(options.path +'\n'+JSON.stringify(postData));
+                   httpPost(options,postData,function(response,resbody){	                   	  
+                      			if (logOnce) {
+                      				 res.write(resbody);
+                      				 res.end(body);
+                      			   console.log(resbody);                   			   
+                      			   logOnce = false;
+                      			 }
+                      		
+                      	});
+                };   //end of forEach                       
+              }
+           }		   
 		   break;
-*/	
-
-   
+ 
 		   case "/stop_instance" : 
-		         var options = {
+		        var options = {
                 hostname: 'api-na.dimensiondata.com',
                 port: 443,
                 path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/shutdownServer',
@@ -920,28 +1005,41 @@ var server = http.createServer(function(req,res){
 	   
 		   
 		   case "/dissociate_eip" : 
-		      
-              var fileEipId = fs.readFileSync(__dirname+'/eipid.log').toString();
-              var eipId = fileEipId.split(',');
-              var fileInsId = fs.readFileSync(__dirname+'/instanceid.log').toString();
-              var insId = fileInsId.split(',');	
-              
-              if (eipId.length != insId.length) {
-              	console.log("Error: EIP number:"+eipId.length," mismatches "+"INSTANCE number:"+insId.length);
-              } else {
-              	var bodytxt ="";
-              	for (i=0; i< eipId.length -1;i++){
-              		var newName = ("eips."+ (i+1)).toString();
-              		bodytxt += "&" + newName + "=" + eipId[i].toString();  	
-              	}
-              var paraQuery = querystring.stringify(jsonObj[pathName]) + bodytxt;
-              var param = querystring.parse(paraQuery);
-              command2Qc.command2Qc(param,method,uri,secret,function(resObj){   
-			          res.write("dissociate eip<br />");
-                      res.write(resObj.status);	
-                      res.end(body);				  
-                      });
-               }
+		      res.write("dissociate EIPs<br />");
+              var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/network/deleteNatRule',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		       options.path = '/caas/2.0/'+organizationId+'/network/deleteNatRule'; 
+			   var logOnce = true;
+             if (natRuleIdArr.length == 0) {  
+             	  console.log("Retrieving no NAT Rules!");
+             	  res.write('Retrieving no NAT Rules!');
+             	  res.end(body);
+                	} else {
+                for (i=0;i<natRuleIdArr.length;i++){
+                   var postData = {
+								  "id" : natRuleIdArr[i]
+                                  };
+                   console.log(options.path +'\n'+JSON.stringify(postData));
+                   httpPost(options,postData,function(response,resbody){	                   	  
+                      			if (logOnce) {
+                      				 res.write(resbody);
+                      				 res.end(body);
+                      			   console.log(resbody);                   			   
+                      			   logOnce = false;
+                      			 }
+                      		
+                      	});
+                };   //end of forEach                       
+              }
               		   
 		   break;
 		   
@@ -983,30 +1081,50 @@ var server = http.createServer(function(req,res){
               }
 		   
 		   break;
-/*		   
-		   case "/delete_eip" : 
-		      
-              var fileEipId = fs.readFileSync(__dirname+'/eipid.log').toString();
-              var eipId = fileEipId.split(',');
-              var fileInsId = fs.readFileSync(__dirname+'/instanceid.log').toString();
-              var insId = fileInsId.split(',');	
-              
-              
-              var bodytxt ="";
-              for (i=0; i< eipId.length -1;i++){
-              	var newName = ("eips."+ (i+1)).toString();   
-              	bodytxt += "&" + newName + "=" + eipId[i].toString(); 
-              }
-              var paraQuery = querystring.stringify(jsonObj[pathName]) + bodytxt;
-			  var param = querystring.parse(paraQuery); 
-              command2Qc.command2Qc(param,method,uri,secret,function(resObj){  
-			      res.write("delete eips<br />");
-                  res.write(resObj.status);	
-                  res.end(body);				  
-                      });
 		   
+		   case "/delete_eip" :   
+		        res.write("Delete EIPs<br />");
+              var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/network/removePublicIpBlock',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		       options.path = '/caas/2.0/'+organizationId+'/network/removePublicIpBlock'; 
+			   var logOnce = true;
+             if (eipBlockIdArr.length == 0) {  
+             	  console.log("Retrieving no external IP blocks!");
+             	  res.write('Retrieving no external IP blocks!');
+             	  res.end(body);
+                	} else {
+                       var index = 0;
+				        while (index < eipBlockIdArr.length) { 
+	                      var isReturn = false;
+				          var postData = {"id":eipBlockIdArr[index]}; 
+                          httpPost(options,postData,function(response,resbody){   
+                              isReturn = true;	 
+                              if (logOnce) { 
+				        	      res.write(resbody);
+				        		  res.end(body);
+                                 logOnce = false;
+                              }
+				        	   console.log(resbody);
+				           });
+                         while(!isReturn){
+                             deasync.runLoopOnce();
+                         }  
+                         console.log(index);	
+	                     index ++;
+                   }		
+              }
+              		   
 		   break;
-	*/	   
+	   
 		   case "/generate_xml" :
 		      generateXML.generateXML(path, zoneDc, securityGroup);   
 			  res.write("LG.xml and twMonServer.xml file generated");
