@@ -4,6 +4,7 @@ Description: Top level module for DimensionData API
 Author: Tony Wang
 Version: 
 0.9 - 1st version based on WebRoutineDD to support full operation for MCP 2.0 
+    - added function for create NatVlan/LG/RS/EIP using deasync module
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -14,6 +15,7 @@ var zlib = require('zlib');
 var zip = require('node-native-zip');
 var mime = require('mime');
 var async = require('async');
+var deasync = require('deasync');
 //var formidable = require('formidable');
 var generateXML = require('./GenerateXML.js');
 var host = "0.0.0.0";
@@ -118,7 +120,7 @@ var body = '<html>'+
     '</style>'+
     '</head>'+
     '<body>'+  
-	'<h1>Welcome to use NodeJs Routine for DimensionData API v0.9.0</h1>'+
+	'<h1>Welcome to use NodeJs Routine for DimensionData API Full v0.9.0</h1>'+
 	'<form enctype="multipart/form-data" action="/UploadKeyCSV" method="post">'+
     '<input type="file" name ="upload" id="choosefile" /><br>'+
     '<input type="submit" value="UploadKeyCSV" id="submitBtn" />'+
@@ -167,13 +169,13 @@ var body = '<html>'+
     '</form>'+
 /*	'<form action="/dissociate_eip" method="post">'+           
 	'<input type="submit" value="Dissociate_eip" style="height:20px;width:120px;background:#A2B5CD" />'+
-    '</form>'+
+    '</form>'+ */
 	'<form action="/delete_instance" method="post">'+           
 	'<input type="submit" value="Delete_instance" style="height:20px;width:120px;background:#A2B5CD" />'+
     '</form>'+
-	'<form action="/delete_eip" method="post">'+           
+/*	'<form action="/delete_eip" method="post">'+           
 	'<input type="submit" value="Delete_eip" style="height:20px;width:120px;background:#A2B5CD" />'+
-    '</form>'+ */
+    '</form>'+  */
 	'<form action="/generate_xml" method="post">'+           
 	'<input type="submit" value="Generate_xml" style="height:20px;width:120px;background:#8E388E;color:#FFFFFF" />'+
     '</form>'+
@@ -395,11 +397,11 @@ var server = http.createServer(function(req,res){
 	  	   
 	   	   case "/create_LG" : 
 	   	       console.log(mod+" "+numOfInstances+" "+eipBandwidth+" "+zoneDc+" "+instanceType+" "+imageId+" "+imageIdRS+" "+path);		         
-		         var postData = 
+		         var postData =  //need to networkdomainid and vlanid to deploy servers
 				         {
                           "name":"twLG",
                           "description":"twLG",
-                          "imageId":"4f472de5-3031-421b-add6-8573b0b03146",
+                          "imageId":"54617fa5-adcb-463f-ba9f-c639113dd27f",             //"4f472de5-3031-421b-add6-8573b0b03146",
                           "start":true,
                  //         "administratorPassword":"Soasta2006",
                           "cpu":{
@@ -444,35 +446,26 @@ var server = http.createServer(function(req,res){
                 	} else {
                 res.write("Creating LGs<br />");
 				LGDone = true;
-				var j = [];
-				for (i=0;i<NUM;i++){j.push(NUM);}
-                async.forEach(j, function (item, callback) {
-                   httpPost(options,postData,function(response,resbody){	
-                            console.log(resbody);				
-                   			if (logOnce) {
-                   				 res.write(resbody);
-                   				 res.end(body);                 			   
-                   			     logOnce = false;
-                   			 }
-							 optionsServer = {
-                                 url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
-                                 headers: {
-                                    'Accept':'application/json'
-                                 },
-                                 auth: {   
-                                    'user': username,
-                                    'pass': password
-                                 }
-                              };	
-                             optionsServer.url = 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server'+'?datacenterId='+zoneDc;
-		                     request(optionsServer, function(error,response,resbody){						 
-								  callback();
-					    	 });
-                   	});					
-                },function(err){
-      		        console.log("all done");    		
-      		    });   //end of forEach                         
-			}
+				var index = 0;
+				while (index < NUM) { 
+	               var isReturn = false;
+				   postData.description = 'twLG'+(index+1);
+                   httpPost(options,postData,function(response,resbody){   
+                       isReturn = true;	 
+                       if (logOnce) { 
+					      res.write(resbody);
+						  res.end(body);
+                          logOnce = false;
+                       }
+					   console.log(resbody);
+				   });
+                  while(!isReturn){
+                      deasync.runLoopOnce();
+                  }  
+                  console.log(index);	
+	              index ++;
+               }
+			 }				
 			  
 	   	   break;
 	   	   
@@ -507,7 +500,7 @@ var server = http.createServer(function(req,res){
                           "microsoftTimeZone":"035"
                           }
 				postData.name = "twRS";
-			    postData.imageID = "939feda5-018b-4520-9634-e6750be1218a";		  
+			    postData.imageId = "ca15e9e2-52f2-4609-aae9-5726e6abe96e";             //"939feda5-018b-4520-9634-e6750be1218a";		  
 		        if (!LGDone) {
 		      	    res.write("Needs LG number to determine RS number, please go back and create some LGs 1st!");
 					res.end(body);	
@@ -533,17 +526,25 @@ var server = http.createServer(function(req,res){
              	  res.end(body);
                 	} else {
                 res.write("Creating RSs<br />");
-                for (i=0;i<rsNum;i++){
-               // console.log(options.path +'\n'+JSON.stringify(postData));
-                httpPost(options,postData,function(response,resbody){	                   	  
-                   			if (logOnce) {
-                   				 res.write(resbody);
-                   				 res.end(body);
-                   			   console.log(resbody);                   			   
-                   			   logOnce = false;
-                   			 }                 		
-                   	});
-                 };   //end of forEach         
+                var index = 0;
+				while (index < rsNum) { 
+	               var isReturn = false;
+				   postData.description = 'twRS'+(index+1);
+                   httpPost(options,postData,function(response,resbody){   
+                       isReturn = true;	 
+                       if (logOnce) { 
+					      res.write(resbody);
+						  res.end(body);
+                          logOnce = false;
+                       }
+					   console.log(resbody);
+				   });
+                  while(!isReturn){
+                      deasync.runLoopOnce();
+                  }  
+                  console.log(index);	
+	              index ++;
+               }        
 			   }
 		     }	
 
@@ -552,13 +553,13 @@ var server = http.createServer(function(req,res){
 	   	  
 		   case "/create_eip" : 
 		    NUM = parseInt(numOfInstances)+rsNum;	   //assuming upload will always happen before create
-			div = Math.floor(NUM/10);
-            mod = NUM - div*10;        
-			console.log("Eips number: "+NUM+" "+div+" "+mod);
+			div = Math.floor(NUM/2);
+            mod = NUM - div*2;
+			var loopNum = div + mod;
 			var options = {
                 hostname: 'api-na.dimensiondata.com',
                 port: 443,
-                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/deployServer',
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/network/addPublicIpBlock',
                 method: "POST",
                 headers: {
                 	    'Accept':'application/json',
@@ -566,18 +567,34 @@ var server = http.createServer(function(req,res){
                 	},
                 auth: username+':'+password
                 };
-				var logOnce = true;
 		        options.path = '/caas/2.0/'+organizationId+'/network/addPublicIpBlock'; 
-                var postData = 	{"networkDomainId": networkDomainId};		
-            	httpPost(options,postData,function(response,resbody){	  
-                			res.write("Creating External IP address..."+logOnce);	
-                   			if (logOnce) {
-                   				 res.write(resbody);
-                   				 res.end(body);
-                   			   console.log(resbody);             			   
-                   			   logOnce = false;
-                   			 }               		
-                   	});			 
+            var logOnce = true;				
+            if (!(NUM > 0)) {  
+             	  console.log("Number of EIPs is invalid! "+NUM);
+             	  res.write('Number of EIPs is invalid! '+NUM);
+             	  res.end(body);
+                	} else {
+                res.write("Creating EIPs<br />");
+				var index = 0;
+				while (index < loopNum) { 
+	               var isReturn = false;
+				   postData = {"networkDomainId":networkDomainId};
+                   httpPost(options,postData,function(response,resbody){   
+                       isReturn = true;	 
+                       if (logOnce) { 
+					      res.write(resbody);
+						  res.end(body);
+                          logOnce = false;
+                       }
+					   console.log(resbody);
+				   });
+                  while(!isReturn){
+                      deasync.runLoopOnce();
+                  }  
+                  console.log(index);	
+	              index ++;
+               }
+			 }			 				
            		   
 		   break;
 		   
@@ -799,7 +816,6 @@ var server = http.createServer(function(req,res){
                 };
 		         options.path = '/caas/2.0/'+organizationId+'/server/shutdownServer';  
              var logOnce = true;
-             res.write('Stopping Servers...<br \>');
              if (idArr.length == 0) {  
              	  console.log("Retrieving no server id!");
              	  res.write('Retrieving no server id!');
@@ -839,13 +855,12 @@ var server = http.createServer(function(req,res){
                 };
 		         options.path = '/caas/2.0/'+organizationId+'/server/startServer';  
              var logOnce = true;
-             res.write('Stopping Servers...<br \>');
              if (idArr.length == 0) {  
              	  console.log("Retrieving no server id!");
              	  res.write('Retrieving no server id!');
              	  res.end(body);
                 	} else {
-                res.write("Stopping instances<br />");
+                res.write("Starting instances<br />");
                 idArr.forEach(function(id){
                 var postData = {'id':id}; 
                 console.log(options.path +'\n'+JSON.stringify(postData));
@@ -879,13 +894,12 @@ var server = http.createServer(function(req,res){
                 };
 		         options.path = '/caas/2.0/'+organizationId+'/server/rebootServer';  
              var logOnce = true;
-             res.write('Stopping Servers...<br \>');
              if (idArr.length == 0) {  
              	  console.log("Retrieving no server id!");
              	  res.write('Retrieving no server id!');
              	  res.end(body);
                 	} else {
-                res.write("Stopping instances<br />");
+                res.write("Rebooting instances<br />");
                 idArr.forEach(function(id){
                 var postData = {'id':id}; 
                 console.log(options.path +'\n'+JSON.stringify(postData));
@@ -904,7 +918,7 @@ var server = http.createServer(function(req,res){
            
 		     break;
 	   
-/*		   
+		   
 		   case "/dissociate_eip" : 
 		      
               var fileEipId = fs.readFileSync(__dirname+'/eipid.log').toString();
@@ -933,23 +947,43 @@ var server = http.createServer(function(req,res){
 		   
 		   case "/delete_instance" :
               
-              var fileInsId = fs.readFileSync(__dirname+'/instanceid.log').toString();
-              var insId = fileInsId.split(',');
-			  var bodytxt ="";
-              for (i=0; i< insId.length -1;i++){
-              		var newName = ("instances."+ (i+1)).toString(); 
-              		bodytxt += "&" + newName + "=" + insId[i].toString();  	
-              	}
-              var paraQuery = querystring.stringify(jsonObj[pathName]) + bodytxt;
-              var param = querystring.parse(paraQuery);              
-              command2Qc.command2Qc(param,method,uri,secret,function(resObj){   
-			     res.write("delete instances<br />");
-                 res.write(resObj.status);	
-                 res.end(body);			  
-              });	   
+               var options = {
+                hostname: 'api-na.dimensiondata.com',
+                port: 443,
+                path: '/caas/2.0/e8cd76a3-7bce-4415-9979-be5b558e0dbd/server/deleteServer',
+                method: "POST",
+                headers: {
+                	    'Accept':'application/json',
+                      'Content-Type':'application/json'
+                	},
+                auth: username+':'+password
+                };
+		         options.path = '/caas/2.0/'+organizationId+'/server/deleteServer';  
+             var logOnce = true;
+             if (idArr.length == 0) {  
+             	  console.log("Retrieving no server id!");
+             	  res.write('Retrieving no server id!');
+             	  res.end(body);
+                	} else {
+                res.write("Deleting instances<br />");
+                idArr.forEach(function(id){
+                var postData = {'id':id}; 
+                console.log(options.path +'\n'+JSON.stringify(postData));
+                httpPost(options,postData,function(response,resbody){	                   	  
+                   			if (logOnce) {
+                   				 res.write(resbody);
+                   				 res.end(body);
+                   			   console.log(resbody);                   			   
+                   			   logOnce = false;
+                   			 }
+                   		
+                   	});
+                });   //end of forEach   
+                      
+              }
 		   
 		   break;
-		   
+/*		   
 		   case "/delete_eip" : 
 		      
               var fileEipId = fs.readFileSync(__dirname+'/eipid.log').toString();
@@ -1058,5 +1092,9 @@ var req = https.request(options, function(res){
 });
 req.write(JSON.stringify(postData));
 req.end();
+}
+
+function sleep(sleepTime) {
+    for(var start = +new Date; +new Date - start <= sleepTime; ) {} 
 }
 

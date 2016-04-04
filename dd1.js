@@ -314,7 +314,7 @@ if (idArr.length == 0) {
    
 }
 */
-
+/*
 var logOnce = true;
 if (idArr.length == 0) {  
 	  console.log("Retrieving no server id!");
@@ -341,9 +341,56 @@ if (idArr.length == 0) {
        	
     }
 
+*/
 
-
-
+deasync = require('deasync');
+options.path = '/caas/2.0/'+organizationId+'/server/deployServer';  
+var index =0;
+var logOnce = true;
+var postData = 
+				         {
+                          "name":"twLG",
+                          "description":"twLG",
+                          "imageId":"4f472de5-3031-421b-add6-8573b0b03146",
+                          "start":true,
+                 //         "administratorPassword":"Soasta2006",
+                          "cpu":{
+                          "count":2,
+                          "coresPerSocket":1,
+                          "speed":"STANDARD"
+                          },
+                          "memoryGb":8,
+                          "primaryDns":"",
+                          "secondaryDns":"",
+                          "networkInfo": {
+                          "networkDomainId":'b84393a1-ed9d-4131-bc33-a240f38eb84c',
+                          "primaryNic" : {"vlanId":'2db7ea40-9e96-4885-b423-d1c2d5566486'}
+						//  "additionalNic" : [
+                        //     {"privateIpv4" : ""},
+                        //     {"vlanId":""}
+                        //     ]
+                          },
+                          "disk" : [{
+                          "scsiId" :"0" ,
+                          "speed" :"STANDARD"   //HIGHPERFORMANCE
+                          }],
+                          "microsoftTimeZone":"035"
+                          }
+while (index <5) { 
+	 isReturn = false;
+     httpPost(options,postData,function(res,body){   
+                    isReturn = true;	 
+           			if (logOnce) {
+           			   console.log(body); 
+           			   logOnce = true;
+           			 }
+           		});
+    while(!isReturn){
+        deasync.runLoopOnce();
+    }  
+    console.log(index);	
+	index ++;
+}
 
 function httpPost(options,postData,callback){	
 
