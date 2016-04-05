@@ -6,6 +6,7 @@ Version:
 0.9 - 1st stable version function implemented: 1.0 and 2.0 support for describe instance, describe ip, start/stop/reboot 
 0.9.1 - added try/catch for networkID proteciton, added one more request after networkdomainId in the upload logic
       - changed postData to postD in the server request logic
+      - change describe eip to describe natrules
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -144,10 +145,13 @@ var body = '<html>'+
     '</form>'+ */
 	'<form action="/describe_instance" method="post">'+           
 	'<input type="submit" value="Describe_instance" style="height:20px;width:120px;background:#CAFF70" />'+
-    '</form>'+
-	'<form action="/describe_eip" method="post">'+           
+  '</form>'+
+/*	'<form action="/describe_eip" method="post">'+           
 	'<input type="submit" value="Describe_eip" style="height:20px;width:120px;background:#CAFF70" />'+
-    '</form>'+
+  '</form>'+ */
+  '<form action="/describe_natrules" method="post">'+           
+	'<input type="submit" value="Describe_natrules" style="height:20px;width:120px;background:#CAFF70" />'+
+  '</form>'+ 
 /*	'<form action="/associate_eip" method="post">'+           
 	'<input type="submit" value="Associate_eip" style="height:20px;width:120px;background:#EEEE00" />'+
     '</form>'+  */
@@ -512,7 +516,7 @@ var server = http.createServer(function(req,res){
 		   
 		   break;
 		   
-		   case "/describe_eip" : 
+		   case "/describe_natrules" : 
 		        var optionsNetwork = {
                 url: 'https://api-na.dimensiondata.com/caas/2.0/'+organizationId+'/server/server',
                 headers: {

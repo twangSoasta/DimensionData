@@ -846,7 +846,7 @@ var server = http.createServer(function(req,res){
 		   break;
 		   		   
 		   case "/associate_eip" :                //need to call the request in a loop, only invoke res.end once
-		      res.write("associate eip<br />");
+		      res.write("Associate EIPs:  ");
               var fileEipId = fs.readFileSync(__dirname+'/eipaddr.log').toString();
               var eipId = fileEipId.split(',');
               var fileInsId = fs.readFileSync(__dirname+'/instanceid.log').toString();
@@ -874,7 +874,7 @@ var server = http.createServer(function(req,res){
              	  res.write('Retrieving no external IPs!');
              	  res.end(body);
                 	} else {
-                res.write("Associate IPs<br />");
+                res.write("Associating...<br />");
                 for (i=0;i<eipId.length-1;i++){
                    var postData = {
                                   "networkDomainId": networkDomainId,
