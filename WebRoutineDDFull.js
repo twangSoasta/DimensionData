@@ -7,6 +7,7 @@ Version:
     - added function for create NatVlan/LG/RS/EIP using deasync module
 	- supported all functions, natRuleIdArr,eipBlockIdArr is used no file written yet, image-id and machine size is not yet working
 	- cpuCores,memSize and imageid inputs are working
+	- correctly display EIP and Instance NUM mismatching numbers
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -865,7 +866,7 @@ var server = http.createServer(function(req,res){
                 };
 		         options.path = '/caas/2.0/'+organizationId+'/network/createNatRule'; 
               if (eipId.length != insId.length) {
-              	console.log("Error: EIP number:"+eipId.length," mismatches "+"INSTANCE number:"+insId.length);
+              	console.log("Error: EIP number:"+(eipId.length-1)," mismatches "+"INSTANCE number:"+(insId.length-1));
 				res.end(body);
               } else {
              var logOnce = true;
