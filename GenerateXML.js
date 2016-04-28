@@ -18,7 +18,7 @@ var endData = "</rp:ObjectSet>";
 var startMonData = 
 '<?xml version=\'1.0\' encoding=\'UTF-8\'?>' +
 '<rp:ObjectSet xmlns:rp="http://www.soasta.com/services/repository">' +
-  '<Object type="target" schemaVersion="8138" name="twMonServer" path="/">' +
+  '<Object type="target" schemaVersion="8138" name="twMonServer' +REGION+ '" path="/">' +
     '<Body>'+
       '<Target xmlns="http://www.soasta.com/services/repository">'+
         '<MonitorDefinition>'+
@@ -57,8 +57,13 @@ var endMonData =
   '</Object>'+
 '</rp:ObjectSet>';
 
-fs.writeFileSync(__dirname+"/LG.xml",startData);
-fs.writeFileSync(__dirname+"/twMonServer.xml",startMonData);
+var fileTwLgMon = fs.readFileSync(__dirname+'/twLGMon.xml').toString();
+var fileTwLgMon = fileTwLgMon.replace("twLGMon","twLGMon"+REGION);
+var fileTwLgMon = fileTwLgMon.replace("twMonServer","twMonServer"+REGION);
+
+fs.writeFileSync(__dirname+"/twLGMon"+REGION+".xml",fileTwLgMon);
+fs.writeFileSync(__dirname+"/LG"+REGION+".xml",startData);
+fs.writeFileSync(__dirname+"/twMonServer"+REGION+".xml",startMonData);
 // 5, 4LG, 1RS     55, 53LG, 2RS, 155, 151LG,4RS   51 = 50 + 1  53 = 51 + 1 + 1(2RS) 104 = 101 + 2 + 1(3RS)
 // 1, 52, 103, 154 are not valid numbers, mod51 == 1 is not valid
 var totalServerNum = instanceIdArr.length -1;
@@ -171,13 +176,13 @@ var mainData = (i<lgNum)?"<Object type=\"server\" schemaVersion=\"8138\" name=\"
   '</Object>\n';
   
 var monData = '<Host>' + eip + '</Host>\n';
-fs.appendFileSync(__dirname+"/LG.xml",mainData);
-fs.appendFileSync(__dirname+"/twMonServer.xml",monData);
+fs.appendFileSync(__dirname+"/LG"+REGION+".xml",mainData);
+fs.appendFileSync(__dirname+"/twMonServer"+REGION+".xml",monData);
 }
   
-fs.appendFileSync(__dirname+"/LG.xml",endData);
+fs.appendFileSync(__dirname+"/LG"+REGION+".xml",endData);
 console.log("LG file write completed!!!");
-fs.appendFileSync(__dirname+"/twMonServer.xml",endMonData);
+fs.appendFileSync(__dirname+"/twMonServer"+REGION+".xml",endMonData);
 console.log("Monitor file write completed!!!");
 }
 

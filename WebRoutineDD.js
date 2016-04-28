@@ -7,6 +7,7 @@ Version:
 0.9.1 - added try/catch for networkID proteciton, added one more request after networkdomainId in the upload logic
       - changed postData to postD in the server request logic
       - change describe eip to describe natrules
+0.9.2 - added name suffix for 3 XML files for different DC locations
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -120,7 +121,7 @@ var body = '<html>'+
     '</style>'+
     '</head>'+
     '<body>'+  
-	'<h1>Welcome to use NodeJs Routine for DimensionData API v0.9.1</h1>'+
+	'<h1>Welcome to use NodeJs Routine for DimensionData API v0.9.2</h1>'+
 	'<form enctype="multipart/form-data" action="/UploadKeyCSV" method="post">'+
     '<input type="file" name ="upload" id="choosefile" /><br>'+
     '<input type="submit" value="UploadKeyCSV" id="submitBtn" />'+
@@ -820,14 +821,14 @@ var server = http.createServer(function(req,res){
 		   break;
 	*/	   
 		   case "/generate_xml" :
-		      generateXML.generateXML(path, zoneDc, securityGroup);   
+		    generateXML.generateXML(path, zoneDc, securityGroup);   
 			  res.write("LG.xml and twMonServer.xml file generated");
 			  res.end(body);
               var archive = new zip();	
               archive.addFiles([
-			  {name:"LG.xml",path:__dirname+"/LG.xml"},
-			  {name:"twMonServer.xml",path:__dirname+"/twMonServer.xml"},
-			  {name:"twLGMon.xml",path:__dirname+"/twLGMon.xml"}			  
+			  {name:"LG"+zoneDc+".xml",path:__dirname+"/LG"+zoneDc+".xml"},
+			  {name:"twMonServer"+zoneDc+".xml",path:__dirname+"/twMonServer"+zoneDc+".xml"},
+			  {name:"twLGMon"+zoneDc+".xml",path:__dirname+"/twLGMon"+zoneDc+".xml"}			  
 			  ],function(err){
 				if (err) return console.log(err);  
 				var buff = archive.toBuffer();
