@@ -10,6 +10,7 @@ Version:
 	- correctly display EIP and Instance NUM mismatching numbers
 0.9.1 - added name suffix for 3 XML files for different DC locations
 0.9.2 - added button to pull versions from main
+      - added reading the LG version, make main version global 
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -59,6 +60,7 @@ var networkDomainId = "";
 var vlanId = "";
 var natRuleIdArr = [];
 var eipBlockIdArr = [];
+var buildNum = "";
 //  -----------------NPM DEPENDENCIES------------------//
 var request = require('request');
 var json2csv = require('json2csv');
@@ -922,13 +924,33 @@ var server = http.createServer(function(req,res){
 		      request(options,function(error,response,resbody){
 		      	var versionIndex = resbody.indexOf("version=");
 		      	var quoteIndex = resbody.indexOf(')',versionIndex);
-		      	var buildNum = resbody.substring(versionIndex,quoteIndex);
+		      	buildNum = resbody.substring(versionIndex+8,quoteIndex);
+				var fileEipId = fs.readFileSync(__dirname+'/eipaddr.log').toString();
+                var eipId = fileEipId.split(',');
 		      	console.log(versionIndex,quoteIndex,buildNum);
-		      	res.write("Main's build number is: "+ buildNum);
-		      	res.end(body);
-		      	
+		      	res.write("Main's build number is: "+ buildNum+"  ");
+				var options = {
+                url: 'http://'+eipId[0]+':8080/concerto/',
+                headers: {
+                   'Accept':'text/html,application/xhtml+xml,application/xml',
+                   'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36'
+                }
+           //     auth: {   
+           //        'user': username,
+           //        'pass': password
+           //     }
+             };
+               console.log(options);
+		       request(options,function(error,response,resbody){
+		      	 var versionIndex = resbody.indexOf("build ");
+		      	 var quoteIndex = resbody.indexOf('\n',versionIndex);
+		      	 var buildNumLG = resbody.substring(versionIndex+6,quoteIndex);
+		      	 console.log(versionIndex,quoteIndex,buildNumLG);
+		      	 res.write("LG's build number is: "+ buildNumLG);
+		      	 res.end(body);		      	
+		       });		      	
 		      });
-		   
+	   
 		   break;
  
 		   case "/stop_instance" : 
