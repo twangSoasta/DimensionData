@@ -970,13 +970,23 @@ var server = http.createServer(function(req,res){
 		      var s3Options = fs.readFileSync(__dirname+'/aws.json').toString();
 		      s3Options = JSON.parse(s3Options);
 		      var s3 = new AWS.S3(s3Options);
-		      var bucketName = "cloudtest-dimension-data-user-data";
-		      var params = {Bucket: 'cloudtest-dimension-data-user-data', Key: eipId[0], Body: maestroFile};
-		      console.log(params);
-             s3.upload(params, function(err, data) {
-             console.log(err, data);
-          });
-		      res.end(body);
+		      var bucketName = "cloudtest-dimension-data-user-data";		      
+		      var index = 0;
+				  while (index < eipId.length-1) { 
+	            var isReturn = false;
+				      var params = {Bucket: 'cloudtest-dimension-data-user-data', Key: eipId[index], Body: maestroFile};
+		          console.log(params);
+              s3.upload(params, function(err, data) {
+                 console.log("Uploading ",index+1,err, data);
+                 isReturn = true;
+              });
+              while(!isReturn){
+                 deasync.runLoopOnce();
+              }  
+                
+	            index ++;
+           }
+           res.end(body);
 		   
 		   break;
  
