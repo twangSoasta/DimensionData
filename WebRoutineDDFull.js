@@ -10,7 +10,8 @@ Version:
 	- correctly display EIP and Instance NUM mismatching numbers
 0.9.1 - added name suffix for 3 XML files for different DC locations
 0.9.2 - added button to pull versions from main
-      - added reading the LG version, make main version global 
+      - added reading the LG version, make main version global
+      - added uploading the maestro files to S3 bucket to trigger update logics
 
 **************************************************************************************************************************************/
 var http = require('http');
@@ -22,6 +23,7 @@ var zip = require('node-native-zip');
 var mime = require('mime');
 var async = require('async');
 var deasync = require('deasync');
+var AWS = require('aws-sdk');
 //var formidable = require('formidable');
 var generateXML = require('./GenerateXML.js');
 var host = "0.0.0.0";
@@ -170,6 +172,9 @@ var body = '<html>'+
     '</form>'+ 
   '<form action="/get_mainversion" method="post">'+           
 	'<input type="submit" value="Get_mainversion" style="height:20px;width:120px;background:#EEEE00" />'+
+    '</form>'+ 
+  '<form action="/upload_maestro" method="post">'+           
+	'<input type="submit" value="Upload_maestro" style="height:20px;width:120px;background:#EEEE00" />'+
     '</form>'+ 
 	'<form action="/stop_instance" method="post">'+           
 	'<input type="submit" value="Stop_instance" style="height:20px;width:120px;background:#EECFA1" />'+
@@ -951,6 +956,30 @@ var server = http.createServer(function(req,res){
 		       });		      	
 		      });
 	   
+		   break;
+		   
+		   case "/upload_maestro":
+		   
+		      var maestroFile = fs.readFileSync(__dirname+"/dimensiondata_maestro_userdata.sh").toString();
+		      var maestroFile = maestroFile.replace("8669", buildNum);
+		      fs.writeFileSync(__dirname+'/dimensiondata_maestro_userdata_upload.sh',maestroFile);
+		      var fileEipId = fs.readFileSync(__dirname+'/eipaddr.log').toString();
+		      var eipId = fileEipId.split(',');
+		      console.log(maestroFile);
+		      res.write("Uploading Maestro Files to S3 Bucket...");
+		      var s3Options = {accessKeyId: 'AKIAJFAMQHX2RJ4YKPQQ', secretAccessKey: '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', region: 'us-east-1'};
+		      var s3 = new AWS.S3(s3Options);
+		    //  AWS.config.update({accessKeyId: 'AKIAJFAMQHX2RJ4YKPQQ', secretAccessKey: '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'});
+		    //  AWS.config.update({region: 'us-east-1'});
+		    //  AWS.config.loadFromPath(__dirname+'/aws.json');
+		      var bucketName = "cloudtest-dimension-data-user-data";
+		      var params = {Bucket: 'cloudtest-dimension-data-user-data', Key: eipId[0], Body: maestroFile};
+		      console.log(params);
+             s3.upload(params, function(err, data) {
+             console.log(err, data);
+          });
+		      res.end(body);
+		   
 		   break;
  
 		   case "/stop_instance" : 
